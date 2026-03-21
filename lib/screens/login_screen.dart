@@ -132,8 +132,9 @@ class LoginScreen extends StatelessWidget {
                 (cachedData["degree"] as String).isNotEmpty;
             bool hasHostel = cachedData["hostel"] != null &&
                 (cachedData["hostel"] as String).isNotEmpty;
-            bool hasRoomNumber = cachedData["roomNumber"] != null &&
-                (cachedData["roomNumber"] as String).isNotEmpty;
+            bool isDayScholar = cachedData["hostel"] == "Day Scholar";
+            bool hasRoomNumber = isDayScholar || (cachedData["roomNumber"] != null &&
+                (cachedData["roomNumber"] as String).isNotEmpty);
             bool hasPhone = cachedData["phone"] != null &&
                 (cachedData["phone"] as String).isNotEmpty;
 
@@ -179,6 +180,10 @@ class LoginScreen extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
 
+            const Icon(Icons.security, size: 64, color: Colors.blueGrey),
+
+            const SizedBox(height: 20),
+
             const Text(
               "NIT Goa Gate System",
               style: TextStyle(
@@ -189,9 +194,10 @@ class LoginScreen extends StatelessWidget {
 
             const SizedBox(height: 40),
 
-            ElevatedButton(
+            ElevatedButton.icon(
               onPressed: () => signInWithGoogle(context),
-              child: const Text("Sign in with Google"),
+              icon: const Icon(Icons.login),
+              label: const Text("Sign in with Google"),
             ),
           ],
         ),

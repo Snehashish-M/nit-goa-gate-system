@@ -22,9 +22,13 @@ class _ProfileSetupState extends State<ProfileSetup> {
   String _name = "";
   String _rollNumber = "";
 
+  // Dropdown options
+  static const List<String> _degreeOptions = ['B.Tech', 'M.Tech', 'Ph.D', 'JRF'];
+  static const List<String> _hostelOptions = ['Talpona Hostel', 'Terekhol Hostel', 'Day Scholar'];
+
   // Editable fields
-  final degreeController = TextEditingController();
-  final hostelController = TextEditingController();
+  String? _selectedDegree;
+  String? _selectedHostel;
   final roomController = TextEditingController();
   final phoneController = TextEditingController();
 
@@ -42,8 +46,6 @@ class _ProfileSetupState extends State<ProfileSetup> {
 
   @override
   void dispose() {
-    degreeController.dispose();
-    hostelController.dispose();
     roomController.dispose();
     phoneController.dispose();
     super.dispose();
@@ -63,8 +65,10 @@ class _ProfileSetupState extends State<ProfileSetup> {
       _name = data["name"] ?? user?.displayName ?? "";
       _rollNumber = data["rollNumber"] ?? "";
 
-      degreeController.text = data["degree"] ?? "";
-      hostelController.text = data["hostel"] ?? "";
+      String degree = data["degree"] ?? "";
+      String hostel = data["hostel"] ?? "";
+      _selectedDegree = _degreeOptions.contains(degree) ? degree : null;
+      _selectedHostel = _hostelOptions.contains(hostel) ? hostel : null;
       roomController.text = data["roomNumber"] ?? "";
       phoneController.text = data["phone"] ?? "";
 
@@ -118,14 +122,26 @@ class _ProfileSetupState extends State<ProfileSetup> {
       return;
     }
 
-    if (degreeController.text.isEmpty ||
-        hostelController.text.isEmpty ||
-        roomController.text.isEmpty ||
+    bool isDayScholar = _selectedHostel == 'Day Scholar';
+
+    if (_selectedDegree == null ||
+        _selectedHostel == null ||
+        (!isDayScholar && roomController.text.isEmpty) ||
         phoneController.text.isEmpty) {
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Please fill all required fields")),
+      );
+      return;
+    }
+
+    // Validate phone number is exactly 10 digits
+    String phone = phoneController.text.trim();
+    if (!RegExp(r'^\d{10}$').hasMatch(phone)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Phone number must be exactly 10 digits")),
       );
       return;
     }
@@ -159,10 +175,10 @@ class _ProfileSetupState extends State<ProfileSetup> {
       }
 
       Map<String, dynamic> profileData = {
-        "degree": degreeController.text,
-        "hostel": hostelController.text,
+        "degree": _selectedDegree,
+        "hostel": _selectedHostel,
         "roomNumber": roomController.text,
-        "phone": phoneController.text,
+        "phone": phoneController.text.trim(),
         "photo": photoBase64,
       };
 
@@ -331,20 +347,44 @@ class _ProfileSetupState extends State<ProfileSetup> {
 
             const SizedBox(height: 15),
 
-            TextField(
-              controller: degreeController,
+            DropdownButtonFormField<String>(
+              value: _selectedDegree,
               decoration: const InputDecoration(
                 labelText: "Degree",
+                prefixIcon: Icon(Icons.school),
               ),
+              items: _degreeOptions.map((degree) {
+                return DropdownMenuItem(
+                  value: degree,
+                  child: Text(degree),
+                );
+              }).toList(),
+              onChanged: (value) {
+                setState(() {
+                  _selectedDegree = value;
+                });
+              },
             ),
 
             const SizedBox(height: 15),
 
-            TextField(
-              controller: hostelController,
+            DropdownButtonFormField<String>(
+              value: _selectedHostel,
               decoration: const InputDecoration(
                 labelText: "Hostel Name",
+                prefixIcon: Icon(Icons.apartment),
               ),
+              items: _hostelOptions.map((hostel) {
+                return DropdownMenuItem(
+                  value: hostel,
+                  child: Text(hostel),
+                );
+              }).toList(),
+              onChanged: (value) {
+                setState(() {
+                  _selectedHostel = value;
+                });
+              },
             ),
 
             const SizedBox(height: 15),
@@ -353,6 +393,7 @@ class _ProfileSetupState extends State<ProfileSetup> {
               controller: roomController,
               decoration: const InputDecoration(
                 labelText: "Room Number",
+                prefixIcon: Icon(Icons.door_front_door),
               ),
             ),
 
@@ -362,14 +403,19 @@ class _ProfileSetupState extends State<ProfileSetup> {
               controller: phoneController,
               decoration: const InputDecoration(
                 labelText: "Phone Number",
+                hintText: "10-digit number",
+                prefixIcon: Icon(Icons.phone),
               ),
+              keyboardType: TextInputType.phone,
+              maxLength: 10,
             ),
 
             const SizedBox(height: 30),
 
-            ElevatedButton(
+            ElevatedButton.icon(
               onPressed: saveProfile,
-              child: const Text("Save Profile"),
+              icon: const Icon(Icons.save),
+              label: const Text("Save Profile"),
             ),
 
           ],

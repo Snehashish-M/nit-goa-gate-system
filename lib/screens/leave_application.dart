@@ -15,7 +15,10 @@ class _LeaveApplicationState extends State<LeaveApplication> {
 
   Map<String, dynamic>? userData;
 
-  final floorController = TextEditingController();
+  // Dropdown options
+  static const List<String> _floorOptions = ['G Floor', '1 Floor', '2 Floor', '3 Floor', '4 Floor'];
+  String? _selectedFloor;
+
   final transportController = TextEditingController();
   final purposeController = TextEditingController();
   final addressController = TextEditingController();
@@ -41,7 +44,6 @@ class _LeaveApplicationState extends State<LeaveApplication> {
 
   @override
   void dispose() {
-    floorController.dispose();
     transportController.dispose();
     purposeController.dispose();
     addressController.dispose();
@@ -136,6 +138,15 @@ class _LeaveApplicationState extends State<LeaveApplication> {
       return;
     }
 
+    // Validate parent phone is exactly 10 digits
+    String parentPhone = parentPhoneController.text.trim();
+    if (!RegExp(r'^\d{10}$').hasMatch(parentPhone)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Parent phone number must be exactly 10 digits")),
+      );
+      return;
+    }
+
     await FirebaseFirestore.instance.collection("leave_requests").add({
 
       "studentId": user.uid,
@@ -148,7 +159,7 @@ class _LeaveApplicationState extends State<LeaveApplication> {
       "phone": userData?["phone"],
       "photo": userData?["photo"] ?? "",
 
-      "floor": floorController.text,
+      "floor": _selectedFloor ?? "",
 
       "leavingDate": leavingDate,
       "returnDate": returnDate,
@@ -162,7 +173,7 @@ class _LeaveApplicationState extends State<LeaveApplication> {
       "purpose": purposeController.text,
 
       "addressDuringLeave": addressController.text,
-      "parentPhone": parentPhoneController.text,
+      "parentPhone": parentPhoneController.text.trim(),
 
       "status": "pending",
 
@@ -217,13 +228,6 @@ class _LeaveApplicationState extends State<LeaveApplication> {
               child: ListView(
                 children: [
 
-                  TextField(
-                    controller: floorController,
-                    decoration: const InputDecoration(labelText: "Floor"),
-                  ),
-
-                  const SizedBox(height: 20),
-
                   ListTile(
                     title: Text(leavingDate == null
                         ? "Select Leaving Date"
@@ -264,6 +268,24 @@ class _LeaveApplicationState extends State<LeaveApplication> {
 
                   const SizedBox(height: 20),
 
+                  DropdownButtonFormField<String>(
+                    value: _selectedFloor,
+                    decoration: const InputDecoration(labelText: "Floor"),
+                    items: _floorOptions.map((floor) {
+                      return DropdownMenuItem(
+                        value: floor,
+                        child: Text(floor),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedFloor = value;
+                      });
+                    },
+                  ),
+
+                  const SizedBox(height: 10),
+
                   TextField(
                     controller: transportController,
                     decoration: const InputDecoration(labelText: "Mode of Transport"),
@@ -287,14 +309,20 @@ class _LeaveApplicationState extends State<LeaveApplication> {
 
                   TextField(
                     controller: parentPhoneController,
-                    decoration: const InputDecoration(labelText: "Parent Phone Number"),
+                    decoration: const InputDecoration(
+                      labelText: "Parent Phone Number",
+                      hintText: "10-digit number",
+                    ),
+                    keyboardType: TextInputType.phone,
+                    maxLength: 10,
                   ),
 
                   const SizedBox(height: 30),
 
-                  ElevatedButton(
+                  ElevatedButton.icon(
                     onPressed: showSubmitConfirmation,
-                    child: const Text("Submit Application"),
+                    icon: const Icon(Icons.send),
+                    label: const Text("Submit Application"),
                   ),
 
                 ],

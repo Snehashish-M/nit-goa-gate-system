@@ -91,8 +91,9 @@ class _AuthGateState extends State<AuthGate> {
             (data["degree"] as String).isNotEmpty;
         bool hasHostel = data["hostel"] != null &&
             (data["hostel"] as String).isNotEmpty;
-        bool hasRoomNumber = data["roomNumber"] != null &&
-            (data["roomNumber"] as String).isNotEmpty;
+        bool isDayScholar = data["hostel"] == "Day Scholar";
+        bool hasRoomNumber = isDayScholar || (data["roomNumber"] != null &&
+            (data["roomNumber"] as String).isNotEmpty);
         bool hasPhone = data["phone"] != null &&
             (data["phone"] as String).isNotEmpty;
 

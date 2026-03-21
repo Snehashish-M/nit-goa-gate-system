@@ -138,66 +138,62 @@ class _StudentDashboardState extends State<StudentDashboard> {
 
             const SizedBox(height: 40),
 
-            ElevatedButton(
+            ElevatedButton.icon(
               onPressed: () {
-
                 Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (context) => const DayScholar(),
                   ),
                 );
-
               },
-              child: const Text("Day Scholar"),
+              icon: const Icon(Icons.school),
+              label: const Text("Day Scholar"),
             ),
 
             const SizedBox(height: 15),
 
-            ElevatedButton(
+            ElevatedButton.icon(
               onPressed: () {
-
                 Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (context) => const HostelExit(),
                   ),
                 );
-
               },
-              child: const Text("Hostel Entry / Exit"),
+              icon: const Icon(Icons.meeting_room),
+              label: const Text("Hostel Entry / Exit"),
             ),
 
             const SizedBox(height: 15),
 
-            ElevatedButton(
+            ElevatedButton.icon(
               onPressed: () {
-
                 Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (context) => const LeaveApplication(),
                   ),
                 );
-
               },
-              child: const Text("Leave Application"),
+              icon: const Icon(Icons.description),
+              label: const Text("Leave Application"),
             ),
 
             const SizedBox(height: 15),
 
-            ElevatedButton(
+            ElevatedButton.icon(
               onPressed: () {
-
                 Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (context) => const LeaveStatus(),
                   ),
                 );
-
               },
-              child: const Text("Leave Status"),
+              icon: const Icon(Icons.fact_check),
+              label: const Text("Leave Status"),
             ),
 
           ],

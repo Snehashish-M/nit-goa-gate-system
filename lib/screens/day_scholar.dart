@@ -136,20 +136,22 @@ class _DayScholarState extends State<DayScholar> {
                     controller: placeController,
                     decoration: const InputDecoration(
                       labelText: "Place you are coming from",
+                      prefixIcon: Icon(Icons.place),
                     ),
                   ),
 
                   const SizedBox(height: 30),
 
-                  ElevatedButton(
+                  ElevatedButton.icon(
                     onPressed: _isLoading ? null : generateQR,
-                    child: _isLoading
+                    icon: _isLoading
                         ? const SizedBox(
                             height: 20,
                             width: 20,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : const Text("Generate QR"),
+                        : const Icon(Icons.qr_code),
+                    label: const Text("Generate QR"),
                   ),
 
                   const SizedBox(height: 40),
