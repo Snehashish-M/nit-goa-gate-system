@@ -170,6 +170,15 @@ class _StudentDashboardState extends State<StudentDashboard> {
 
             ElevatedButton.icon(
               onPressed: () {
+                var data = UserCache().profileData;
+                if (data != null && data["hostel"] == "Day Scholar") {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text("Leave applications are only for hostel residents."),
+                    ),
+                  );
+                  return;
+                }
                 Navigator.push(
                   context,
                   MaterialPageRoute(
