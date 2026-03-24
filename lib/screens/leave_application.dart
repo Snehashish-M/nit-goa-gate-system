@@ -147,6 +147,27 @@ class _LeaveApplicationState extends State<LeaveApplication> {
       return;
     }
 
+    // Check if there's already a pending or approved leave request
+    var existingLeave = await FirebaseFirestore.instance
+        .collection("leave_requests")
+        .where("studentId", isEqualTo: user.uid)
+        .where("status", whereIn: ["pending", "approved"])
+        .limit(1)
+        .get();
+
+    if (existingLeave.docs.isNotEmpty) {
+      if (!mounted) return;
+      String existingStatus = existingLeave.docs.first["status"];
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(
+          existingStatus == "pending"
+              ? "You already have a pending leave request."
+              : "You already have an approved leave. Use it before applying again."
+        )),
+      );
+      return;
+    }
+
     await FirebaseFirestore.instance.collection("leave_requests").add({
 
       "studentId": user.uid,

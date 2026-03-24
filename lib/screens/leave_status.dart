@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -272,7 +273,7 @@ class _LeaveStatusState extends State<LeaveStatus> {
                                 const SizedBox(height: 20),
 
                                 if (status == "approved")
-                                  _ApprovedLeaveWidget(passId: leaveRequest["passId"])
+                                  _ApprovedLeaveWidget(passId: leaveRequest.id)
 
                                 else if (status == "rejected")
                                   const Padding(
@@ -328,57 +329,84 @@ class _LeaveStatusState extends State<LeaveStatus> {
 
 }
 
-class _ApprovedLeaveWidget extends StatelessWidget {
+class _ApprovedLeaveWidget extends StatefulWidget {
 
   final String passId;
 
   const _ApprovedLeaveWidget({required this.passId});
 
   @override
+  State<_ApprovedLeaveWidget> createState() => _ApprovedLeaveWidgetState();
+}
+
+class _ApprovedLeaveWidgetState extends State<_ApprovedLeaveWidget> {
+
+  StreamSubscription? _passListener;
+  bool _isDeleted = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _watchPass();
+  }
+
+  @override
+  void dispose() {
+    _passListener?.cancel();
+    super.dispose();
+  }
+
+  void _watchPass() {
+    _passListener = FirebaseFirestore.instance
+        .collection("leave_requests")
+        .doc(widget.passId)
+        .snapshots()
+        .listen((snapshot) {
+      if (!snapshot.exists && mounted) {
+        setState(() => _isDeleted = true);
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
 
-    return FutureBuilder(
+    if (_isDeleted) {
+      return const Padding(
+        padding: EdgeInsets.all(20),
+        child: Center(
+          child: Text(
+            "Gate pass has been used.",
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.grey,
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+            ),
+          ),
+        ),
+      );
+    }
 
-      future: FirebaseFirestore.instance
-          .collection("gate_passes")
-          .doc(passId)
-          .get(),
+    return Center(
 
-      builder: (context, snapshot) {
+      child: Column(
+        children: [
 
-        if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        if (!snapshot.data!.exists) {
-          return const Center(
-            child: Text("QR Code not found"),
-          );
-        }
-
-        return Center(
-
-          child: Column(
-            children: [
-
-              const Text(
-                "Your QR Code:",
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-
-              const SizedBox(height: 20),
-
-              QrImageView(
-                data: passId,
-                size: 250,
-              ),
-
-            ],
+          const Text(
+            "Your QR Code:",
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           ),
 
-        );
+          const SizedBox(height: 20),
 
-      },
+          QrImageView(
+            data: widget.passId,
+            size: 250,
+          ),
+
+        ],
+      ),
 
     );
 

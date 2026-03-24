@@ -80,50 +80,12 @@ class _WardenDashboardState extends State<WardenDashboard> {
   }
 
   Future approveRequest(BuildContext context, DocumentSnapshot request) async {
-    DocumentReference passRef =
-        FirebaseFirestore.instance.collection("gate_passes").doc();
-
-    await passRef.set({
-
-      "studentId": request["studentId"],
-
-      "name": request["name"],
-      "rollNumber": request["rollNumber"],
-      "degree": request["degree"],
-      "hostel": request["hostel"],
-      "roomNumber": request["roomNumber"],
-      "phone": request["phone"],
-      "photo": request["photo"] ?? "",
-
-      "type": "leave",
-
-      "floor": request["floor"] ?? "",
-
-      "leavingDate": request["leavingDate"],
-      "returnDate": request["returnDate"],
-      "leavingTime": request["leavingTime"] ?? "",
-      "returnTime": request["returnTime"] ?? "",
-      "durationDays": request["durationDays"] ?? 0,
-
-      "modeOfTransport": request["modeOfTransport"] ?? "",
-      "purpose": request["purpose"] ?? "",
-      "addressDuringLeave": request["addressDuringLeave"] ?? "",
-      "parentPhone": request["parentPhone"] ?? "",
-
-      "status": "active",
-
-      "scanCount": 0,
-
-      "createdAt": Timestamp.now()
-
-    });
 
     await FirebaseFirestore.instance
         .collection("leave_requests")
         .doc(request.id)
         .update({
       "status": "approved",
-      "passId": passRef.id
     });
 
     // Refresh the list after approval

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -19,6 +20,7 @@ class _HostelExitState extends State<HostelExit> {
 
   String? qrData;
   bool _isLoading = false;
+  StreamSubscription? _passListener;
 
   @override
   void initState() {
@@ -28,10 +30,12 @@ class _HostelExitState extends State<HostelExit> {
     if (userData == null) {
       _loadFromFirestore();
     }
+    _loadExistingPass();
   }
 
   @override
   void dispose() {
+    _passListener?.cancel();
     destinationController.dispose();
     super.dispose();
   }
@@ -45,9 +49,49 @@ class _HostelExitState extends State<HostelExit> {
     }
   }
 
+  /// Check if there's already an active hostel gate pass for this user
+  Future _loadExistingPass() async {
+    User? user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    try {
+      var snapshot = await FirebaseFirestore.instance
+          .collection("gate_passes")
+          .where("studentId", isEqualTo: user.uid)
+          .where("type", isEqualTo: "hostel")
+          .where("status", isEqualTo: "active")
+          .limit(1)
+          .get();
+
+      if (snapshot.docs.isNotEmpty && mounted) {
+        var doc = snapshot.docs.first;
+        // Only show QR for recent passes (created within the last 12 hours)
+        var createdAt = doc["createdAt"] as Timestamp?;
+        if (createdAt != null) {
+          var age = DateTime.now().difference(createdAt.toDate());
+          if (age.inHours > 12) return;
+        }
+        setState(() {
+          qrData = doc.id;
+        });
+        _watchPass(doc.id);
+      }
+    } catch (e) {
+      debugPrint("Error loading existing pass: $e");
+    }
+  }
+
   Future generateQR() async {
 
     if (userData == null) return;
+
+    // Prevent generating a new QR if one is already active
+    if (qrData != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("You already have an active QR code.")),
+      );
+      return;
+    }
 
     // Validate destination field
     if (destinationController.text.isEmpty) {
@@ -97,6 +141,8 @@ class _HostelExitState extends State<HostelExit> {
         _isLoading = false;
       });
 
+      _watchPass(passRef.id);
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("QR Code generated successfully")),
@@ -113,6 +159,25 @@ class _HostelExitState extends State<HostelExit> {
         );
       }
     }
+  }
+
+  /// Watches the gate pass document — if it gets deleted, hide the QR
+  void _watchPass(String passId) {
+    _passListener?.cancel();
+    _passListener = FirebaseFirestore.instance
+        .collection("gate_passes")
+        .doc(passId)
+        .snapshots()
+        .listen((snapshot) {
+      if (!snapshot.exists && mounted) {
+        setState(() {
+          qrData = null;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Gate pass used. QR code removed.")),
+        );
+      }
+    });
   }
 
   @override
