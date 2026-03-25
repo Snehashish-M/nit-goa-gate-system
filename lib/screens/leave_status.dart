@@ -150,6 +150,29 @@ class _LeaveStatusState extends State<LeaveStatus> {
                   ),
                 ),
               ],
+
+              // Rejection reason in details
+              Builder(
+                builder: (context) {
+                  String? rejectionReason;
+                  try {
+                    rejectionReason = leaveRequest["rejectionReason"];
+                  } catch (_) {}
+                  if (rejectionReason != null && rejectionReason.isNotEmpty) {
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 10),
+                      child: Text(
+                        "Rejection Reason: $rejectionReason",
+                        style: const TextStyle(
+                          color: Colors.red,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    );
+                  }
+                  return const SizedBox.shrink();
+                },
+              ),
             ],
           ),
         ),
@@ -392,19 +415,44 @@ class _LeaveStatusState extends State<LeaveStatus> {
                                   )
 
                                 else if (status == "rejected")
-                                  const Padding(
-                                    padding: EdgeInsets.all(20),
+                                  Padding(
+                                    padding: const EdgeInsets.all(20),
                                     child: SizedBox(
                                       width: double.infinity,
-                                      child: Center(
-                                        child: Text(
-                                          "Your leave request has been rejected.",
-                                          style: TextStyle(
-                                            color: Colors.red,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 16,
+                                      child: Column(
+                                        children: [
+                                          const Text(
+                                            "Your leave request has been rejected.",
+                                            style: TextStyle(
+                                              color: Colors.red,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 16,
+                                            ),
                                           ),
-                                        ),
+                                          Builder(
+                                            builder: (context) {
+                                              String? rejectionReason;
+                                              try {
+                                                rejectionReason = leaveRequest["rejectionReason"];
+                                              } catch (_) {}
+                                              if (rejectionReason != null && rejectionReason.isNotEmpty) {
+                                                return Padding(
+                                                  padding: const EdgeInsets.only(top: 8),
+                                                  child: Text(
+                                                    "Reason: $rejectionReason",
+                                                    textAlign: TextAlign.center,
+                                                    style: const TextStyle(
+                                                      color: Colors.red,
+                                                      fontStyle: FontStyle.italic,
+                                                      fontSize: 14,
+                                                    ),
+                                                  ),
+                                                );
+                                              }
+                                              return const SizedBox.shrink();
+                                            },
+                                          ),
+                                        ],
                                       ),
                                     ),
                                   )

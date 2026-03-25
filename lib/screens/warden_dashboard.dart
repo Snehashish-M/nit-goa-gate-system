@@ -25,6 +25,11 @@ class _WardenDashboardState extends State<WardenDashboard>
   bool _isLoadingLeaves = true;
   bool _isLoadingExtensions = true;
 
+  String _leaveSearchQuery = "";
+  String _extensionSearchQuery = "";
+  final _leaveSearchController = TextEditingController();
+  final _extensionSearchController = TextEditingController();
+
   @override
   void initState() {
     super.initState();
@@ -36,6 +41,8 @@ class _WardenDashboardState extends State<WardenDashboard>
   @override
   void dispose() {
     _tabController.dispose();
+    _leaveSearchController.dispose();
+    _extensionSearchController.dispose();
     super.dispose();
   }
 
@@ -172,13 +179,18 @@ class _WardenDashboardState extends State<WardenDashboard>
     _fetchPendingRequests();
   }
 
-  Future rejectRequest(BuildContext context, DocumentSnapshot request) async {
+  Future rejectRequest(BuildContext context, DocumentSnapshot request, {String? reason}) async {
+    Map<String, dynamic> updateData = {
+      "status": "rejected",
+    };
+    if (reason != null && reason.trim().isNotEmpty) {
+      updateData["rejectionReason"] = reason.trim();
+    }
+
     await FirebaseFirestore.instance
         .collection("leave_requests")
         .doc(request.id)
-        .update({
-      "status": "rejected"
-    });
+        .update(updateData);
 
     _fetchPendingRequests();
   }
@@ -207,11 +219,29 @@ class _WardenDashboardState extends State<WardenDashboard>
   }
 
   void showRejectConfirmation(BuildContext context, DocumentSnapshot request) {
+    final reasonController = TextEditingController();
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text("Confirm Rejection"),
-        content: Text("Reject leave for ${request["name"]}?"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("Reject leave for ${request["name"]}?"),
+            const SizedBox(height: 15),
+            TextField(
+              controller: reasonController,
+              decoration: const InputDecoration(
+                labelText: "Reason (optional)",
+                prefixIcon: Icon(Icons.edit_note),
+                hintText: "Enter reason for rejection",
+              ),
+              maxLines: 2,
+            ),
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -220,7 +250,7 @@ class _WardenDashboardState extends State<WardenDashboard>
           TextButton(
             onPressed: () {
               Navigator.pop(context);
-              rejectRequest(context, request);
+              rejectRequest(context, request, reason: reasonController.text);
             },
             child: const Text("Reject"),
           ),
@@ -452,246 +482,332 @@ class _WardenDashboardState extends State<WardenDashboard>
   // ─── Tab 1: Leave Requests ───
 
   Widget _buildLeaveRequestsTab() {
+    // Filter based on search query
+    List<DocumentSnapshot> filtered = _pendingRequests;
+    if (_leaveSearchQuery.isNotEmpty) {
+      filtered = _pendingRequests.where((req) {
+        String name = (req["name"] ?? "").toString().toLowerCase();
+        String roll = (req["rollNumber"] ?? "").toString().toLowerCase();
+        String query = _leaveSearchQuery.toLowerCase();
+        return name.contains(query) || roll.contains(query);
+      }).toList();
+    }
+
     return RefreshIndicator(
       onRefresh: _fetchPendingRequests,
       child: _isLoadingLeaves
           ? const Center(child: CircularProgressIndicator())
-          : _pendingRequests.isEmpty
-              ? ListView(
-                  children: const [
-                    SizedBox(height: 200),
-                    Center(child: Text("No Pending Requests")),
-                    SizedBox(height: 20),
-                    Center(
-                      child: Text(
-                        "Pull down to refresh",
-                        style: TextStyle(color: Colors.grey, fontSize: 13),
+          : Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                  child: TextField(
+                    controller: _leaveSearchController,
+                    decoration: InputDecoration(
+                      hintText: "Search by name or roll number",
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: _leaveSearchQuery.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                _leaveSearchController.clear();
+                                setState(() => _leaveSearchQuery = "");
+                              },
+                            )
+                          : null,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 10),
                     ),
-                  ],
-                )
-              : ListView.builder(
-
-                  itemCount: _pendingRequests.length,
-
-                  itemBuilder: (context, index) {
-
-                    var request = _pendingRequests[index];
-
-                    return GestureDetector(
-                      onTap: () => showLeaveDetails(context, request),
-                      child: Card(
-
-                        margin: const EdgeInsets.all(10),
-
-                        child: Padding(
-                          padding: const EdgeInsets.all(15),
-
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-
-                            children: [
-
-                              Row(
-                                children: [
-                                  _buildStudentAvatarFromDoc(request, radius: 25),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text("${request["name"]}",
-                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                                        Text("Roll: ${request["rollNumber"]}"),
-                                        Text("${request["degree"]} • ${request["hostel"]} - ${request["roomNumber"]}"),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-
-                              const SizedBox(height: 10),
-
-                              Text("Purpose: ${request["purpose"]}"),
-
-                              const SizedBox(height: 10),
-
-                              Row(
-
-                                children: [
-
-                                  ElevatedButton(
-                                    onPressed: () {
-                                      showApproveConfirmation(context, request);
-                                    },
-                                    child: const Text("Approve"),
-                                  ),
-
-                                  const SizedBox(width: 10),
-
-                                  ElevatedButton(
-                                    onPressed: () {
-                                      showRejectConfirmation(context, request);
-                                    },
-                                    child: const Text("Reject"),
-                                  ),
-
-                                ],
-                              )
-
-                            ],
-                          ),
-                        ),
-
-                      ),
-                    );
-
-                  },
-
+                    onChanged: (value) {
+                      setState(() => _leaveSearchQuery = value);
+                    },
+                  ),
                 ),
+                Expanded(
+                  child: filtered.isEmpty
+                      ? ListView(
+                          children: const [
+                            SizedBox(height: 150),
+                            Center(child: Text("No Pending Requests")),
+                            SizedBox(height: 20),
+                            Center(
+                              child: Text(
+                                "Pull down to refresh",
+                                style: TextStyle(color: Colors.grey, fontSize: 13),
+                              ),
+                            ),
+                          ],
+                        )
+                      : ListView.builder(
+
+                          itemCount: filtered.length,
+
+                          itemBuilder: (context, index) {
+
+                            var request = filtered[index];
+
+                            return GestureDetector(
+                              onTap: () => showLeaveDetails(context, request),
+                              child: Card(
+
+                                margin: const EdgeInsets.all(10),
+
+                                child: Padding(
+                                  padding: const EdgeInsets.all(15),
+
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+
+                                    children: [
+
+                                      Row(
+                                        children: [
+                                          _buildStudentAvatarFromDoc(request, radius: 25),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text("${request["name"]}",
+                                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                                Text("Roll: ${request["rollNumber"]}"),
+                                                Text("${request["degree"]} • ${request["hostel"]} - ${request["roomNumber"]}"),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+
+                                      const SizedBox(height: 10),
+
+                                      Text("Purpose: ${request["purpose"]}"),
+
+                                      const SizedBox(height: 10),
+
+                                      Row(
+
+                                        children: [
+
+                                          ElevatedButton(
+                                            onPressed: () {
+                                              showApproveConfirmation(context, request);
+                                            },
+                                            child: const Text("Approve"),
+                                          ),
+
+                                          const SizedBox(width: 10),
+
+                                          ElevatedButton(
+                                            onPressed: () {
+                                              showRejectConfirmation(context, request);
+                                            },
+                                            child: const Text("Reject"),
+                                          ),
+
+                                        ],
+                                      )
+
+                                    ],
+                                  ),
+                                ),
+
+                              ),
+                            );
+
+                          },
+
+                        ),
+                ),
+              ],
+            ),
     );
   }
 
   // ─── Tab 2: Extension Requests ───
 
   Widget _buildExtensionRequestsTab() {
+    // Filter based on search query
+    List<DocumentSnapshot> filtered = _extensionRequests;
+    if (_extensionSearchQuery.isNotEmpty) {
+      filtered = _extensionRequests.where((req) {
+        String name = (req["name"] ?? "").toString().toLowerCase();
+        String roll = (req["rollNumber"] ?? "").toString().toLowerCase();
+        String query = _extensionSearchQuery.toLowerCase();
+        return name.contains(query) || roll.contains(query);
+      }).toList();
+    }
+
     return RefreshIndicator(
       onRefresh: _fetchExtensionRequests,
       child: _isLoadingExtensions
           ? const Center(child: CircularProgressIndicator())
-          : _extensionRequests.isEmpty
-              ? ListView(
-                  children: const [
-                    SizedBox(height: 200),
-                    Center(child: Text("No Pending Extension Requests")),
-                    SizedBox(height: 20),
-                    Center(
-                      child: Text(
-                        "Pull down to refresh",
-                        style: TextStyle(color: Colors.grey, fontSize: 13),
+          : Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                  child: TextField(
+                    controller: _extensionSearchController,
+                    decoration: InputDecoration(
+                      hintText: "Search by name or roll number",
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: _extensionSearchQuery.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                _extensionSearchController.clear();
+                                setState(() => _extensionSearchQuery = "");
+                              },
+                            )
+                          : null,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 10),
                     ),
-                  ],
-                )
-              : ListView.builder(
+                    onChanged: (value) {
+                      setState(() => _extensionSearchQuery = value);
+                    },
+                  ),
+                ),
+                Expanded(
+                  child: filtered.isEmpty
+                      ? ListView(
+                          children: const [
+                            SizedBox(height: 150),
+                            Center(child: Text("No Pending Extension Requests")),
+                            SizedBox(height: 20),
+                            Center(
+                              child: Text(
+                                "Pull down to refresh",
+                                style: TextStyle(color: Colors.grey, fontSize: 13),
+                              ),
+                            ),
+                          ],
+                        )
+                      : ListView.builder(
 
-                  itemCount: _extensionRequests.length,
+                          itemCount: filtered.length,
 
-                  itemBuilder: (context, index) {
+                          itemBuilder: (context, index) {
 
-                    var extRequest = _extensionRequests[index];
+                            var extRequest = filtered[index];
 
-                    DateTime? currentReturnDate;
-                    DateTime? newReturnDate;
+                            DateTime? currentReturnDate;
+                            DateTime? newReturnDate;
 
-                    try {
-                      if (extRequest["returnDate"] is Timestamp) {
-                        currentReturnDate = (extRequest["returnDate"] as Timestamp).toDate();
-                      }
-                      if (extRequest["extensionNewReturnDate"] is Timestamp) {
-                        newReturnDate = (extRequest["extensionNewReturnDate"] as Timestamp).toDate();
-                      }
-                    } catch (e) {
-                      debugPrint("Error parsing extension dates: $e");
-                    }
+                            try {
+                              if (extRequest["returnDate"] is Timestamp) {
+                                currentReturnDate = (extRequest["returnDate"] as Timestamp).toDate();
+                              }
+                              if (extRequest["extensionNewReturnDate"] is Timestamp) {
+                                newReturnDate = (extRequest["extensionNewReturnDate"] as Timestamp).toDate();
+                              }
+                            } catch (e) {
+                              debugPrint("Error parsing extension dates: $e");
+                            }
 
-                    String? photoBase64;
-                    try {
-                      photoBase64 = extRequest["photo"];
-                    } catch (_) {}
+                            String? photoBase64;
+                            try {
+                              photoBase64 = extRequest["photo"];
+                            } catch (_) {}
 
-                    return Card(
+                            return Card(
 
-                      margin: const EdgeInsets.all(10),
+                              margin: const EdgeInsets.all(10),
 
-                      child: Padding(
-                        padding: const EdgeInsets.all(15),
+                              child: Padding(
+                                padding: const EdgeInsets.all(15),
 
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
 
-                          children: [
+                                  children: [
 
-                            Row(
-                              children: [
-                                _buildStudentAvatar(photoBase64, radius: 25),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
+                                    Row(
+                                      children: [
+                                        _buildStudentAvatar(photoBase64, radius: 25),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                "${extRequest["name"]}",
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 16,
+                                                ),
+                                              ),
+                                              Text("Roll: ${extRequest["rollNumber"]}"),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+
+                                    const SizedBox(height: 12),
+
+                                    if (currentReturnDate != null)
                                       Text(
-                                        "${extRequest["name"]}",
+                                        "Current Return: ${DateFormat('yyyy-MM-dd').format(currentReturnDate)}",
+                                        style: const TextStyle(fontSize: 14),
+                                      ),
+
+                                    if (newReturnDate != null)
+                                      Text(
+                                        "Requested Return: ${DateFormat('yyyy-MM-dd').format(newReturnDate)}",
                                         style: const TextStyle(
+                                          fontSize: 14,
                                           fontWeight: FontWeight.bold,
-                                          fontSize: 16,
+                                          color: Colors.blue,
                                         ),
                                       ),
-                                      Text("Roll: ${extRequest["rollNumber"]}"),
-                                    ],
-                                  ),
+
+                                    const SizedBox(height: 8),
+
+                                    Text(
+                                      "Reason: ${extRequest["extensionReason"]}",
+                                      style: const TextStyle(fontSize: 14),
+                                    ),
+
+                                    const SizedBox(height: 12),
+
+                                    Row(
+                                      children: [
+
+                                        ElevatedButton(
+                                          onPressed: () {
+                                            showExtensionApproveConfirmation(context, extRequest);
+                                          },
+                                          child: const Text("Approve"),
+                                        ),
+
+                                        const SizedBox(width: 10),
+
+                                        ElevatedButton(
+                                          onPressed: () {
+                                            showExtensionRejectConfirmation(context, extRequest);
+                                          },
+                                          child: const Text("Reject"),
+                                        ),
+
+                                      ],
+                                    ),
+
+                                  ],
                                 ),
-                              ],
-                            ),
-
-                            const SizedBox(height: 12),
-
-                            if (currentReturnDate != null)
-                              Text(
-                                "Current Return: ${DateFormat('yyyy-MM-dd').format(currentReturnDate)}",
-                                style: const TextStyle(fontSize: 14),
                               ),
 
-                            if (newReturnDate != null)
-                              Text(
-                                "Requested Return: ${DateFormat('yyyy-MM-dd').format(newReturnDate)}",
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.blue,
-                                ),
-                              ),
+                            );
 
-                            const SizedBox(height: 8),
+                          },
 
-                            Text(
-                              "Reason: ${extRequest["extensionReason"]}",
-                              style: const TextStyle(fontSize: 14),
-                            ),
-
-                            const SizedBox(height: 12),
-
-                            Row(
-                              children: [
-
-                                ElevatedButton(
-                                  onPressed: () {
-                                    showExtensionApproveConfirmation(context, extRequest);
-                                  },
-                                  child: const Text("Approve"),
-                                ),
-
-                                const SizedBox(width: 10),
-
-                                ElevatedButton(
-                                  onPressed: () {
-                                    showExtensionRejectConfirmation(context, extRequest);
-                                  },
-                                  child: const Text("Reject"),
-                                ),
-
-                              ],
-                            ),
-
-                          ],
                         ),
-                      ),
-
-                    );
-
-                  },
-
                 ),
+              ],
+            ),
     );
   }
 }
