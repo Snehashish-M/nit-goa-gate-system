@@ -272,15 +272,43 @@ class _ProfileSetupState extends State<ProfileSetup> {
             Center(
               child: Stack(
                 children: [
-                  CircleAvatar(
-                    radius: 55,
-                    backgroundColor: Colors.grey[300],
-                    backgroundImage: displayBytes != null
-                        ? MemoryImage(displayBytes)
+                  GestureDetector(
+                    onTap: displayBytes != null
+                        ? () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => Scaffold(
+                                  backgroundColor: Colors.black,
+                                  appBar: AppBar(
+                                    backgroundColor: Colors.black,
+                                    foregroundColor: Colors.white,
+                                    title: const Text("Profile Picture"),
+                                  ),
+                                  body: Center(
+                                    child: InteractiveViewer(
+                                      child: Image.memory(
+                                        displayBytes,
+                                        fit: BoxFit.contain,
+                                        width: double.infinity,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          }
                         : null,
-                    child: displayBytes == null
-                        ? const Icon(Icons.person, size: 50, color: Colors.grey)
-                        : null,
+                    child: CircleAvatar(
+                      radius: 55,
+                      backgroundColor: Colors.grey[300],
+                      backgroundImage: displayBytes != null
+                          ? MemoryImage(displayBytes)
+                          : null,
+                      child: displayBytes == null
+                          ? const Icon(Icons.person, size: 50, color: Colors.grey)
+                          : null,
+                    ),
                   ),
                   Positioned(
                     bottom: 0,

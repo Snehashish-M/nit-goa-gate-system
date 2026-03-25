@@ -15,20 +15,35 @@ class WardenDashboard extends StatefulWidget {
   State<WardenDashboard> createState() => _WardenDashboardState();
 }
 
-class _WardenDashboardState extends State<WardenDashboard> {
+class _WardenDashboardState extends State<WardenDashboard>
+    with SingleTickerProviderStateMixin {
+
+  late TabController _tabController;
 
   List<DocumentSnapshot> _pendingRequests = [];
-  bool _isLoading = true;
+  List<DocumentSnapshot> _extensionRequests = [];
+  bool _isLoadingLeaves = true;
+  bool _isLoadingExtensions = true;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     _fetchPendingRequests();
+    _fetchExtensionRequests();
   }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  // ─── Fetch leave requests ───
 
   Future<void> _fetchPendingRequests() async {
     setState(() {
-      _isLoading = true;
+      _isLoadingLeaves = true;
     });
 
     try {
@@ -40,26 +55,51 @@ class _WardenDashboardState extends State<WardenDashboard> {
       if (mounted) {
         setState(() {
           _pendingRequests = snapshot.docs;
-          _isLoading = false;
+          _isLoadingLeaves = false;
         });
       }
     } catch (e) {
       debugPrint("Error fetching requests: $e");
       if (mounted) {
         setState(() {
-          _isLoading = false;
+          _isLoadingLeaves = false;
         });
       }
     }
   }
 
-  /// Builds a CircleAvatar with the student's photo from base64, or a fallback icon
-  Widget _buildStudentAvatar(DocumentSnapshot request, {double radius = 25}) {
-    String? photoBase64;
-    try {
-      photoBase64 = request["photo"];
-    } catch (_) {}
+  // ─── Fetch extension requests ───
 
+  Future<void> _fetchExtensionRequests() async {
+    setState(() {
+      _isLoadingExtensions = true;
+    });
+
+    try {
+      var snapshot = await FirebaseFirestore.instance
+          .collection("leave_requests")
+          .where("extensionStatus", isEqualTo: "pending")
+          .get();
+
+      if (mounted) {
+        setState(() {
+          _extensionRequests = snapshot.docs;
+          _isLoadingExtensions = false;
+        });
+      }
+    } catch (e) {
+      debugPrint("Error fetching extension requests: $e");
+      if (mounted) {
+        setState(() {
+          _isLoadingExtensions = false;
+        });
+      }
+    }
+  }
+
+  // ─── Helpers ───
+
+  Widget _buildStudentAvatar(String? photoBase64, {double radius = 25}) {
     Uint8List? photoBytes;
     if (photoBase64 != null && photoBase64.isNotEmpty) {
       try {
@@ -69,7 +109,7 @@ class _WardenDashboardState extends State<WardenDashboard> {
       }
     }
 
-    return CircleAvatar(
+    Widget avatar = CircleAvatar(
       radius: radius,
       backgroundColor: Colors.grey[300],
       backgroundImage: photoBytes != null ? MemoryImage(photoBytes) : null,
@@ -77,10 +117,51 @@ class _WardenDashboardState extends State<WardenDashboard> {
           ? Icon(Icons.person, size: radius, color: Colors.grey)
           : null,
     );
+
+    if (photoBytes != null) {
+      return GestureDetector(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => Scaffold(
+                backgroundColor: Colors.black,
+                appBar: AppBar(
+                  backgroundColor: Colors.black,
+                  foregroundColor: Colors.white,
+                  title: const Text("Student Photo"),
+                ),
+                body: Center(
+                  child: InteractiveViewer(
+                    child: Image.memory(
+                      photoBytes!,
+                      fit: BoxFit.contain,
+                      width: double.infinity,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+        child: avatar,
+      );
+    }
+
+    return avatar;
   }
 
-  Future approveRequest(BuildContext context, DocumentSnapshot request) async {
+  Widget _buildStudentAvatarFromDoc(DocumentSnapshot request, {double radius = 25}) {
+    String? photoBase64;
+    try {
+      photoBase64 = request["photo"];
+    } catch (_) {}
+    return _buildStudentAvatar(photoBase64, radius: radius);
+  }
 
+  // ─── Leave request approve / reject ───
+
+  Future approveRequest(BuildContext context, DocumentSnapshot request) async {
     await FirebaseFirestore.instance
         .collection("leave_requests")
         .doc(request.id)
@@ -88,12 +169,10 @@ class _WardenDashboardState extends State<WardenDashboard> {
       "status": "approved",
     });
 
-    // Refresh the list after approval
     _fetchPendingRequests();
   }
 
   Future rejectRequest(BuildContext context, DocumentSnapshot request) async {
-
     await FirebaseFirestore.instance
         .collection("leave_requests")
         .doc(request.id)
@@ -101,7 +180,6 @@ class _WardenDashboardState extends State<WardenDashboard> {
       "status": "rejected"
     });
 
-    // Refresh the list after rejection
     _fetchPendingRequests();
   }
 
@@ -177,7 +255,7 @@ class _WardenDashboardState extends State<WardenDashboard> {
             children: [
               // Student photo
               Center(
-                child: _buildStudentAvatar(request, radius: 40),
+                child: _buildStudentAvatarFromDoc(request, radius: 40),
               ),
               const SizedBox(height: 15),
               Text("Name: ${request["name"]}"),
@@ -210,6 +288,117 @@ class _WardenDashboardState extends State<WardenDashboard> {
     );
   }
 
+  // ─── Extension approve / reject ───
+
+  void showExtensionApproveConfirmation(BuildContext context, DocumentSnapshot extRequest) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Confirm Extension Approval"),
+        content: Text("Approve extension for ${extRequest["name"]}?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _approveExtension(extRequest);
+            },
+            child: const Text("Approve"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void showExtensionRejectConfirmation(BuildContext context, DocumentSnapshot extRequest) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Confirm Extension Rejection"),
+        content: Text("Reject extension for ${extRequest["name"]}?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _rejectExtension(extRequest);
+            },
+            child: const Text("Reject"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future _approveExtension(DocumentSnapshot extRequest) async {
+    try {
+      Timestamp newReturnDate = extRequest["extensionNewReturnDate"];
+      Timestamp leavingDateTs = extRequest["leavingDate"];
+      DateTime leavingDate = leavingDateTs.toDate();
+      DateTime newReturn = newReturnDate.toDate();
+      int newDuration = newReturn.difference(leavingDate).inDays + 1;
+
+      // Update the same leave request doc
+      await FirebaseFirestore.instance
+          .collection("leave_requests")
+          .doc(extRequest.id)
+          .update({
+        "returnDate": newReturnDate,
+        "durationDays": newDuration,
+        "extended": true,
+        "extensionStatus": "approved",
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Extension approved")),
+        );
+      }
+
+      _fetchExtensionRequests();
+    } catch (e) {
+      debugPrint("Error approving extension: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error: ${e.toString()}")),
+        );
+      }
+    }
+  }
+
+  Future _rejectExtension(DocumentSnapshot extRequest) async {
+    try {
+      // Update extension status on the same leave request doc
+      await FirebaseFirestore.instance
+          .collection("leave_requests")
+          .doc(extRequest.id)
+          .update({"extensionStatus": "rejected"});
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Extension rejected")),
+        );
+      }
+
+      _fetchExtensionRequests();
+    } catch (e) {
+      debugPrint("Error rejecting extension: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error: ${e.toString()}")),
+        );
+      }
+    }
+  }
+
+  // ─── Build ───
+
   @override
   Widget build(BuildContext context) {
 
@@ -232,108 +421,277 @@ class _WardenDashboardState extends State<WardenDashboard> {
             },
           ),
         ],
+        bottom: TabBar(
+          controller: _tabController,
+          tabs: const [
+            Tab(
+              icon: Icon(Icons.description),
+              text: "Leave Requests",
+            ),
+            Tab(
+              icon: Icon(Icons.date_range),
+              text: "Extensions",
+            ),
+          ],
+        ),
       ),
 
-      body: RefreshIndicator(
-        onRefresh: _fetchPendingRequests,
-        child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : _pendingRequests.isEmpty
-                ? ListView(
-                    // Wrap in ListView so pull-to-refresh works even when empty
-                    children: const [
-                      SizedBox(height: 200),
-                      Center(child: Text("No Pending Requests")),
-                      SizedBox(height: 20),
-                      Center(
-                        child: Text(
-                          "Pull down to refresh",
-                          style: TextStyle(color: Colors.grey, fontSize: 13),
-                        ),
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          // Tab 1: Leave Requests
+          _buildLeaveRequestsTab(),
+          // Tab 2: Extension Requests
+          _buildExtensionRequestsTab(),
+        ],
+      ),
+
+    );
+  }
+
+  // ─── Tab 1: Leave Requests ───
+
+  Widget _buildLeaveRequestsTab() {
+    return RefreshIndicator(
+      onRefresh: _fetchPendingRequests,
+      child: _isLoadingLeaves
+          ? const Center(child: CircularProgressIndicator())
+          : _pendingRequests.isEmpty
+              ? ListView(
+                  children: const [
+                    SizedBox(height: 200),
+                    Center(child: Text("No Pending Requests")),
+                    SizedBox(height: 20),
+                    Center(
+                      child: Text(
+                        "Pull down to refresh",
+                        style: TextStyle(color: Colors.grey, fontSize: 13),
                       ),
-                    ],
-                  )
-                : ListView.builder(
+                    ),
+                  ],
+                )
+              : ListView.builder(
 
-                    itemCount: _pendingRequests.length,
+                  itemCount: _pendingRequests.length,
 
-                    itemBuilder: (context, index) {
+                  itemBuilder: (context, index) {
 
-                      var request = _pendingRequests[index];
+                    var request = _pendingRequests[index];
 
-                      return GestureDetector(
-                        onTap: () => showLeaveDetails(context, request),
-                        child: Card(
+                    return GestureDetector(
+                      onTap: () => showLeaveDetails(context, request),
+                      child: Card(
 
-                          margin: const EdgeInsets.all(10),
+                        margin: const EdgeInsets.all(10),
 
-                          child: Padding(
-                            padding: const EdgeInsets.all(15),
+                        child: Padding(
+                          padding: const EdgeInsets.all(15),
 
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
 
+                            children: [
+
+                              Row(
+                                children: [
+                                  _buildStudentAvatarFromDoc(request, radius: 25),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text("${request["name"]}",
+                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                        Text("Roll: ${request["rollNumber"]}"),
+                                        Text("${request["degree"]} • ${request["hostel"]} - ${request["roomNumber"]}"),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+
+                              const SizedBox(height: 10),
+
+                              Text("Purpose: ${request["purpose"]}"),
+
+                              const SizedBox(height: 10),
+
+                              Row(
+
+                                children: [
+
+                                  ElevatedButton(
+                                    onPressed: () {
+                                      showApproveConfirmation(context, request);
+                                    },
+                                    child: const Text("Approve"),
+                                  ),
+
+                                  const SizedBox(width: 10),
+
+                                  ElevatedButton(
+                                    onPressed: () {
+                                      showRejectConfirmation(context, request);
+                                    },
+                                    child: const Text("Reject"),
+                                  ),
+
+                                ],
+                              )
+
+                            ],
+                          ),
+                        ),
+
+                      ),
+                    );
+
+                  },
+
+                ),
+    );
+  }
+
+  // ─── Tab 2: Extension Requests ───
+
+  Widget _buildExtensionRequestsTab() {
+    return RefreshIndicator(
+      onRefresh: _fetchExtensionRequests,
+      child: _isLoadingExtensions
+          ? const Center(child: CircularProgressIndicator())
+          : _extensionRequests.isEmpty
+              ? ListView(
+                  children: const [
+                    SizedBox(height: 200),
+                    Center(child: Text("No Pending Extension Requests")),
+                    SizedBox(height: 20),
+                    Center(
+                      child: Text(
+                        "Pull down to refresh",
+                        style: TextStyle(color: Colors.grey, fontSize: 13),
+                      ),
+                    ),
+                  ],
+                )
+              : ListView.builder(
+
+                  itemCount: _extensionRequests.length,
+
+                  itemBuilder: (context, index) {
+
+                    var extRequest = _extensionRequests[index];
+
+                    DateTime? currentReturnDate;
+                    DateTime? newReturnDate;
+
+                    try {
+                      if (extRequest["returnDate"] is Timestamp) {
+                        currentReturnDate = (extRequest["returnDate"] as Timestamp).toDate();
+                      }
+                      if (extRequest["extensionNewReturnDate"] is Timestamp) {
+                        newReturnDate = (extRequest["extensionNewReturnDate"] as Timestamp).toDate();
+                      }
+                    } catch (e) {
+                      debugPrint("Error parsing extension dates: $e");
+                    }
+
+                    String? photoBase64;
+                    try {
+                      photoBase64 = extRequest["photo"];
+                    } catch (_) {}
+
+                    return Card(
+
+                      margin: const EdgeInsets.all(10),
+
+                      child: Padding(
+                        padding: const EdgeInsets.all(15),
+
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+
+                          children: [
+
+                            Row(
+                              children: [
+                                _buildStudentAvatar(photoBase64, radius: 25),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        "${extRequest["name"]}",
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                                      Text("Roll: ${extRequest["rollNumber"]}"),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+
+                            const SizedBox(height: 12),
+
+                            if (currentReturnDate != null)
+                              Text(
+                                "Current Return: ${DateFormat('yyyy-MM-dd').format(currentReturnDate)}",
+                                style: const TextStyle(fontSize: 14),
+                              ),
+
+                            if (newReturnDate != null)
+                              Text(
+                                "Requested Return: ${DateFormat('yyyy-MM-dd').format(newReturnDate)}",
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.blue,
+                                ),
+                              ),
+
+                            const SizedBox(height: 8),
+
+                            Text(
+                              "Reason: ${extRequest["extensionReason"]}",
+                              style: const TextStyle(fontSize: 14),
+                            ),
+
+                            const SizedBox(height: 12),
+
+                            Row(
                               children: [
 
-                                Row(
-                                  children: [
-                                    _buildStudentAvatar(request, radius: 25),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text("${request["name"]}",
-                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                                          Text("Roll: ${request["rollNumber"]}"),
-                                          Text("${request["degree"]} • ${request["hostel"]} - ${request["roomNumber"]}"),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
+                                ElevatedButton(
+                                  onPressed: () {
+                                    showExtensionApproveConfirmation(context, extRequest);
+                                  },
+                                  child: const Text("Approve"),
                                 ),
 
-                                const SizedBox(height: 10),
+                                const SizedBox(width: 10),
 
-                                Text("Purpose: ${request["purpose"]}"),
-
-                                const SizedBox(height: 10),
-
-                                Row(
-
-                                  children: [
-
-                                    ElevatedButton(
-                                      onPressed: () {
-                                        showApproveConfirmation(context, request);
-                                      },
-                                      child: const Text("Approve"),
-                                    ),
-
-                                    const SizedBox(width: 10),
-
-                                    ElevatedButton(
-                                      onPressed: () {
-                                        showRejectConfirmation(context, request);
-                                      },
-                                      child: const Text("Reject"),
-                                    ),
-
-                                  ],
-                                )
+                                ElevatedButton(
+                                  onPressed: () {
+                                    showExtensionRejectConfirmation(context, extRequest);
+                                  },
+                                  child: const Text("Reject"),
+                                ),
 
                               ],
                             ),
-                          ),
 
+                          ],
                         ),
-                      );
+                      ),
 
-                    },
+                    );
 
-                  ),
-      ),
+                  },
 
+                ),
     );
   }
 }

@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
+
 class LeaveStatus extends StatefulWidget {
   const LeaveStatus({super.key});
 
@@ -66,6 +67,9 @@ class _LeaveStatusState extends State<LeaveStatus> {
     DateTime? leavingDate;
     DateTime? returnDate;
 
+    bool isExtended = false;
+    String? extensionStatus;
+
     try {
       if (leaveRequest["leavingDate"] is Timestamp) {
         leavingDate = (leaveRequest["leavingDate"] as Timestamp).toDate();
@@ -76,6 +80,14 @@ class _LeaveStatusState extends State<LeaveStatus> {
     } catch (e) {
       debugPrint("Error parsing dates: $e");
     }
+
+    try {
+      isExtended = leaveRequest["extended"] == true;
+    } catch (_) {}
+
+    try {
+      extensionStatus = leaveRequest["extensionStatus"];
+    } catch (_) {}
 
     showDialog(
       context: context,
@@ -93,16 +105,51 @@ class _LeaveStatusState extends State<LeaveStatus> {
               Text("Room: ${leaveRequest["roomNumber"]}"),
               Text("Phone: ${leaveRequest["phone"]}"),
               const SizedBox(height: 10),
+
               if (leavingDate != null)
                 Text("Leaving Date: ${DateFormat('yyyy-MM-dd').format(leavingDate)}"),
+
               if (returnDate != null)
-                Text("Return Date: ${DateFormat('yyyy-MM-dd').format(returnDate)}"),
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text("Return Date: ${DateFormat('yyyy-MM-dd').format(returnDate)}"),
+                    ),
+                    if (isExtended)
+                      const Text(
+                        "  EXTENDED",
+                        style: TextStyle(
+                          color: Colors.blue,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                  ],
+                ),
+
               Text("Duration: ${leaveRequest["durationDays"]} days"),
+
               const SizedBox(height: 10),
               Text("Mode of Transport: ${leaveRequest["modeOfTransport"]}"),
               Text("Purpose: ${leaveRequest["purpose"]}"),
               Text("Address During Leave: ${leaveRequest["addressDuringLeave"]}"),
               Text("Parent Phone: ${leaveRequest["parentPhone"]}"),
+
+              // Extension status in details
+              if (extensionStatus != null) ...[
+                const SizedBox(height: 10),
+                Text(
+                  "Extension: ${extensionStatus == 'approved' ? 'Approved' : extensionStatus == 'rejected' ? 'Rejected' : 'Pending'}",
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: extensionStatus == 'approved'
+                        ? Colors.green
+                        : extensionStatus == 'rejected'
+                            ? Colors.red
+                            : Colors.orange,
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -164,6 +211,8 @@ class _LeaveStatusState extends State<LeaveStatus> {
 
                       DateTime? leavingDate;
                       DateTime? returnDate;
+                      bool isExtended = false;
+                      String? extensionStatus;
 
                       try {
                         if (leaveRequest["leavingDate"] is Timestamp) {
@@ -175,6 +224,14 @@ class _LeaveStatusState extends State<LeaveStatus> {
                       } catch (e) {
                         debugPrint("Error parsing dates: $e");
                       }
+
+                      try {
+                        isExtended = leaveRequest["extended"] == true;
+                      } catch (_) {}
+
+                      try {
+                        extensionStatus = leaveRequest["extensionStatus"];
+                      } catch (_) {}
 
                       String purpose = leaveRequest["purpose"] ?? "N/A";
 
@@ -247,15 +304,70 @@ class _LeaveStatusState extends State<LeaveStatus> {
                                   ),
 
                                 if (returnDate != null)
-                                  Text(
-                                    "To: ${DateFormat('yyyy-MM-dd').format(returnDate)}",
-                                    style: const TextStyle(fontSize: 14),
+                                  Row(
+                                    children: [
+                                      Text(
+                                        "To: ${DateFormat('yyyy-MM-dd').format(returnDate)}",
+                                        style: const TextStyle(fontSize: 14),
+                                      ),
+                                      if (isExtended)
+                                        const Text(
+                                          "  EXTENDED",
+                                          style: TextStyle(
+                                            color: Colors.blue,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                    ],
                                   ),
 
                                 Text(
                                   "Purpose: $purpose",
                                   style: const TextStyle(fontSize: 14),
                                 ),
+
+                                // Extension status badge
+                                if (extensionStatus != null) ...[
+                                  const SizedBox(height: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: extensionStatus == "approved"
+                                          ? Colors.blue.withValues(alpha: 0.1)
+                                          : extensionStatus == "rejected"
+                                              ? Colors.red.withValues(alpha: 0.1)
+                                              : Colors.orange.withValues(alpha: 0.1),
+                                      border: Border.all(
+                                        color: extensionStatus == "approved"
+                                            ? Colors.blue
+                                            : extensionStatus == "rejected"
+                                                ? Colors.red
+                                                : Colors.orange,
+                                      ),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(
+                                      extensionStatus == "approved"
+                                          ? "Extension: Approved"
+                                          : extensionStatus == "rejected"
+                                              ? "Extension: Rejected"
+                                              : "Extension: Pending",
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        color: extensionStatus == "approved"
+                                            ? Colors.blue
+                                            : extensionStatus == "rejected"
+                                                ? Colors.red
+                                                : Colors.orange,
+                                      ),
+                                    ),
+                                  ),
+                                ],
 
                                 const SizedBox(height: 15),
 
@@ -273,7 +385,11 @@ class _LeaveStatusState extends State<LeaveStatus> {
                                 const SizedBox(height: 20),
 
                                 if (status == "approved")
-                                  _ApprovedLeaveWidget(passId: leaveRequest.id)
+                                  _ApprovedLeaveWidget(
+                                    passId: leaveRequest.id,
+                                    leavingDate: leavingDate,
+                                    extensionStatus: extensionStatus,
+                                  )
 
                                 else if (status == "rejected")
                                   const Padding(
@@ -332,8 +448,14 @@ class _LeaveStatusState extends State<LeaveStatus> {
 class _ApprovedLeaveWidget extends StatefulWidget {
 
   final String passId;
+  final DateTime? leavingDate;
+  final String? extensionStatus;
 
-  const _ApprovedLeaveWidget({required this.passId});
+  const _ApprovedLeaveWidget({
+    required this.passId,
+    this.leavingDate,
+    this.extensionStatus,
+  });
 
   @override
   State<_ApprovedLeaveWidget> createState() => _ApprovedLeaveWidgetState();
@@ -344,6 +466,9 @@ class _ApprovedLeaveWidgetState extends State<_ApprovedLeaveWidget> {
   StreamSubscription? _passListener;
   bool _isDeleted = false;
 
+  final _reasonController = TextEditingController();
+  DateTime? _selectedNewReturnDate;
+
   @override
   void initState() {
     super.initState();
@@ -353,6 +478,7 @@ class _ApprovedLeaveWidgetState extends State<_ApprovedLeaveWidget> {
   @override
   void dispose() {
     _passListener?.cancel();
+    _reasonController.dispose();
     super.dispose();
   }
 
@@ -366,6 +492,113 @@ class _ApprovedLeaveWidgetState extends State<_ApprovedLeaveWidget> {
         setState(() => _isDeleted = true);
       }
     });
+  }
+
+  void _showExtensionForm() {
+    _selectedNewReturnDate = null;
+    _reasonController.clear();
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text("Apply for Extension"),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(
+                    _selectedNewReturnDate == null
+                        ? "Select New Return Date"
+                        : DateFormat('yyyy-MM-dd').format(_selectedNewReturnDate!),
+                  ),
+                  trailing: const Icon(Icons.calendar_today),
+                  onTap: () async {
+                    DateTime? picked = await showDatePicker(
+                      context: context,
+                      initialDate: DateTime.now().add(const Duration(days: 1)),
+                      firstDate: DateTime.now(),
+                      lastDate: DateTime(2030),
+                    );
+                    if (picked != null) {
+                      setDialogState(() {
+                        _selectedNewReturnDate = picked;
+                      });
+                    }
+                  },
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: _reasonController,
+                  decoration: const InputDecoration(
+                    labelText: "Reason for Extension",
+                    prefixIcon: Icon(Icons.edit_note),
+                  ),
+                  maxLines: 3,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text("Cancel"),
+            ),
+            TextButton(
+              onPressed: () {
+                if (_selectedNewReturnDate == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("Please select a new return date")),
+                  );
+                  return;
+                }
+                if (_reasonController.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("Please enter a reason")),
+                  );
+                  return;
+                }
+                Navigator.pop(dialogContext);
+                _submitExtension();
+              },
+              child: const Text("Submit"),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _submitExtension() async {
+    User? user = FirebaseAuth.instance.currentUser;
+    if (user == null || _selectedNewReturnDate == null) return;
+
+    try {
+      // Store extension data directly on the leave request document
+      await FirebaseFirestore.instance
+          .collection("leave_requests")
+          .doc(widget.passId)
+          .update({
+        "extensionStatus": "pending",
+        "extensionNewReturnDate": Timestamp.fromDate(_selectedNewReturnDate!),
+        "extensionReason": _reasonController.text.trim(),
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Extension request submitted")),
+        );
+      }
+    } catch (e) {
+      debugPrint("Error submitting extension: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error: ${e.toString()}")),
+        );
+      }
+    }
   }
 
   @override
@@ -388,6 +621,9 @@ class _ApprovedLeaveWidgetState extends State<_ApprovedLeaveWidget> {
       );
     }
 
+    // Can apply for extension only if no extension has been requested yet
+    bool canApplyExtension = widget.extensionStatus == null;
+
     return Center(
 
       child: Column(
@@ -404,6 +640,15 @@ class _ApprovedLeaveWidgetState extends State<_ApprovedLeaveWidget> {
             data: widget.passId,
             size: 250,
           ),
+
+          if (canApplyExtension) ...[
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              onPressed: _showExtensionForm,
+              icon: const Icon(Icons.date_range),
+              label: const Text("Apply for Extension"),
+            ),
+          ],
 
         ],
       ),
