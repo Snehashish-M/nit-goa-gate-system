@@ -30,12 +30,14 @@ class _WardenDashboardState extends State<WardenDashboard>
   final _leaveSearchController = TextEditingController();
   final _extensionSearchController = TextEditingController();
 
+  String? _selectedHostel;
+  final List<String> _hostels = ["Talpona Hostel", "Terekhol Hostel"];
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _fetchPendingRequests();
-    _fetchExtensionRequests();
+    _loadSavedHostel();
   }
 
   @override
@@ -46,6 +48,55 @@ class _WardenDashboardState extends State<WardenDashboard>
     super.dispose();
   }
 
+  // ─── Load saved hostel preference ───
+
+  Future<void> _loadSavedHostel() async {
+    User? user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    try {
+      var doc = await FirebaseFirestore.instance
+          .collection("users")
+          .doc(user.uid)
+          .get();
+
+      if (doc.exists && doc.data()!.containsKey("wardenHostel")) {
+        String saved = doc["wardenHostel"];
+        if (_hostels.contains(saved)) {
+          setState(() => _selectedHostel = saved);
+          _fetchPendingRequests();
+          _fetchExtensionRequests();
+          return;
+        }
+      }
+    } catch (e) {
+      debugPrint("Error loading saved hostel: $e");
+    }
+
+    // No saved preference — just show the dropdown
+    setState(() {
+      _isLoadingLeaves = false;
+      _isLoadingExtensions = false;
+    });
+  }
+
+  void _onHostelChanged(String? hostel) async {
+    if (hostel == null) return;
+    setState(() => _selectedHostel = hostel);
+
+    // Save to Firestore
+    User? user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      await FirebaseFirestore.instance
+          .collection("users")
+          .doc(user.uid)
+          .update({"wardenHostel": hostel});
+    }
+
+    _fetchPendingRequests();
+    _fetchExtensionRequests();
+  }
+
   // ─── Fetch leave requests ───
 
   Future<void> _fetchPendingRequests() async {
@@ -54,10 +105,15 @@ class _WardenDashboardState extends State<WardenDashboard>
     });
 
     try {
-      var snapshot = await FirebaseFirestore.instance
+      var query = FirebaseFirestore.instance
           .collection("leave_requests")
-          .where("status", isEqualTo: "pending")
-          .get();
+          .where("status", isEqualTo: "pending");
+
+      if (_selectedHostel != null) {
+        query = query.where("hostel", isEqualTo: _selectedHostel);
+      }
+
+      var snapshot = await query.get();
 
       if (mounted) {
         setState(() {
@@ -83,10 +139,15 @@ class _WardenDashboardState extends State<WardenDashboard>
     });
 
     try {
-      var snapshot = await FirebaseFirestore.instance
+      var query = FirebaseFirestore.instance
           .collection("leave_requests")
-          .where("extensionStatus", isEqualTo: "pending")
-          .get();
+          .where("extensionStatus", isEqualTo: "pending");
+
+      if (_selectedHostel != null) {
+        query = query.where("hostel", isEqualTo: _selectedHostel);
+      }
+
+      var snapshot = await query.get();
 
       if (mounted) {
         setState(() {
@@ -435,8 +496,30 @@ class _WardenDashboardState extends State<WardenDashboard>
     return Scaffold(
 
       appBar: AppBar(
-        title: const Text("Warden Dashboard"),
+        title: Text(_selectedHostel ?? "Warden Dashboard"),
         actions: [
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.apartment),
+            tooltip: "Select Hostel",
+            onSelected: _onHostelChanged,
+            itemBuilder: (context) => _hostels.map((hostel) {
+              return PopupMenuItem<String>(
+                value: hostel,
+                child: Row(
+                  children: [
+                    Icon(
+                      _selectedHostel == hostel
+                          ? Icons.radio_button_checked
+                          : Icons.radio_button_unchecked,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 10),
+                    Text(hostel),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {
