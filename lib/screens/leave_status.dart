@@ -40,6 +40,28 @@ class _LeaveStatusState extends State<LeaveStatus> {
 
       var docs = snapshot.docs;
 
+      // Auto-delete rejected requests older than 3 days
+      DateTime now = DateTime.now();
+      List<DocumentSnapshot> toRemove = [];
+      for (var doc in docs) {
+        if (doc["status"] == "rejected") {
+          try {
+            Timestamp? rejectedAt = doc["rejectedAt"];
+            if (rejectedAt != null) {
+              Duration diff = now.difference(rejectedAt.toDate());
+              if (diff.inDays >= 2) {
+                await FirebaseFirestore.instance
+                    .collection("leave_requests")
+                    .doc(doc.id)
+                    .delete();
+                toRemove.add(doc);
+              }
+            }
+          } catch (_) {}
+        }
+      }
+      docs.removeWhere((d) => toRemove.contains(d));
+
       // Sort by createdAt descending
       docs.sort((a, b) {
         Timestamp aTime = a["createdAt"] ?? Timestamp.now();

@@ -243,6 +243,7 @@ class _WardenDashboardState extends State<WardenDashboard>
   Future rejectRequest(BuildContext context, DocumentSnapshot request, {String? reason}) async {
     Map<String, dynamic> updateData = {
       "status": "rejected",
+      "rejectedAt": Timestamp.now(),
     };
     if (reason != null && reason.trim().isNotEmpty) {
       updateData["rejectionReason"] = reason.trim();
