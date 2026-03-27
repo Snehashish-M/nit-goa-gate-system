@@ -671,6 +671,101 @@ class _ApprovedLeaveWidgetState extends State<_ApprovedLeaveWidget> {
     }
   }
 
+  void _showDeleteConfirmation() {
+    final confirmController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text("Delete Leave QR"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.red.withValues(alpha: 0.1),
+                border: Border.all(color: Colors.red),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.warning, color: Colors.red),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      "Delete this QR only if you are NOT going on leave. If you have already left the campus using this QR, DO NOT delete it — you will need it to re-enter.",
+                      style: TextStyle(
+                        color: Colors.red,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 15),
+            const Text(
+              "Type  delete_qr  to confirm:",
+              style: TextStyle(fontSize: 14),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: confirmController,
+              decoration: const InputDecoration(
+                hintText: "delete_qr",
+                border: OutlineInputBorder(),
+                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () async {
+              if (confirmController.text.trim() != "delete_qr") {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("Please type 'delete_qr' to confirm")),
+                );
+                return;
+              }
+              Navigator.pop(dialogContext);
+
+              try {
+                await FirebaseFirestore.instance
+                    .collection("leave_requests")
+                    .doc(widget.passId)
+                    .delete();
+
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("Leave QR deleted successfully")),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text("Error: ${e.toString()}")),
+                  );
+                }
+              }
+            },
+            child: const Text(
+              "Delete",
+              style: TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
 
@@ -719,6 +814,18 @@ class _ApprovedLeaveWidgetState extends State<_ApprovedLeaveWidget> {
               label: const Text("Apply for Extension"),
             ),
           ],
+
+          const SizedBox(height: 15),
+
+          ElevatedButton.icon(
+            onPressed: _showDeleteConfirmation,
+            icon: const Icon(Icons.delete_forever),
+            label: const Text("Delete QR"),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+          ),
 
         ],
       ),

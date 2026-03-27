@@ -82,19 +82,26 @@ class _ProfileSetupState extends State<ProfileSetup> {
 
     final picked = await picker.pickImage(
       source: ImageSource.gallery,
-      maxWidth: 200,
-      maxHeight: 200,
-      imageQuality: 70,
+      maxWidth: 500,
+      maxHeight: 500,
+      imageQuality: 85,
     );
 
     if (picked != null) {
 
       final bytes = await picked.readAsBytes();
-      final sizeKB = (bytes.length / 1024).toStringAsFixed(1);
+      final sizeKB = bytes.length / 1024;
+
+      if (sizeKB > 100) {
+        setState(() {
+          _photoStatus = "Photo too large (${sizeKB.toStringAsFixed(1)}KB). Max 100KB. ✗";
+        });
+        return;
+      }
 
       setState(() {
         _imageBytes = bytes;
-        _photoStatus = "Photo selected ✓ (${sizeKB}KB)";
+        _photoStatus = "Photo selected ✓ (${sizeKB.toStringAsFixed(1)}KB)";
       });
 
     }
@@ -132,6 +139,15 @@ class _ProfileSetupState extends State<ProfileSetup> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Please fill all required fields")),
+      );
+      return;
+    }
+
+    // Require photo on first-time setup
+    if (widget.isFirstTime && _imageBytes == null && (existingPhotoBase64 == null || existingPhotoBase64!.isEmpty)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please upload your photo")),
       );
       return;
     }
@@ -334,6 +350,21 @@ class _ProfileSetupState extends State<ProfileSetup> {
             ),
 
             const SizedBox(height: 8),
+
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 30),
+                child: Text(
+                  "This photo will be viewed by the warden. Please upload a clear photo where your face is visible.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.grey,
+                    fontSize: 12,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ),
+            ),
 
             if (_photoStatus.isNotEmpty)
               Center(

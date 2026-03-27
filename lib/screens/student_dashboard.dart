@@ -11,6 +11,7 @@ import 'leave_application.dart';
 import 'leave_status.dart';
 import 'profile_setup.dart';
 import 'login_screen.dart';
+import 'app_info_screen.dart';
 
 class StudentDashboard extends StatefulWidget {
   const StudentDashboard({super.key});
@@ -56,6 +57,13 @@ class _StudentDashboardState extends State<StudentDashboard> {
       );
       // Reload photo from updated cache
       _loadPhoto();
+    } else if (value == "info") {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const AppInfoScreen(),
+        ),
+      );
     } else if (value == "logout") {
       UserCache().clear();
       await GoogleSignIn().signOut();
@@ -92,6 +100,16 @@ class _StudentDashboardState extends State<StudentDashboard> {
                     Icon(Icons.edit, size: 20),
                     SizedBox(width: 10),
                     Text("Edit Profile"),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: "info",
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, size: 20),
+                    SizedBox(width: 10),
+                    Text("Information"),
                   ],
                 ),
               ),
