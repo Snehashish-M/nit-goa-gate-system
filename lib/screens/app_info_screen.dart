@@ -1,13 +1,51 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:nit_goa_gate_app/services/user_cache.dart';
+import 'student_dashboard.dart';
 
-class AppInfoScreen extends StatelessWidget {
-  const AppInfoScreen({super.key});
+class AppInfoScreen extends StatefulWidget {
+  final bool isFirstTime;
+
+  const AppInfoScreen({super.key, this.isFirstTime = false});
+
+  @override
+  State<AppInfoScreen> createState() => _AppInfoScreenState();
+}
+
+class _AppInfoScreenState extends State<AppInfoScreen> {
+  bool _hasReadInfo = false;
+
+  Future<void> _proceedToDashboard() async {
+    User? user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    try {
+      await FirebaseFirestore.instance
+          .collection("users")
+          .doc(user.uid)
+          .update({"infoAcknowledged": true});
+
+      UserCache().updateCache({"infoAcknowledged": true});
+    } catch (e) {
+      debugPrint("Error saving info acknowledgement: $e");
+    }
+
+    if (!mounted) return;
+
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (context) => const StudentDashboard()),
+      (route) => false,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text("How to Use"),
+        automaticallyImplyLeading: !widget.isFirstTime,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -84,6 +122,45 @@ class AppInfoScreen extends StatelessWidget {
                 "Rejected applications are automatically removed after 2 days.",
               ],
             ),
+
+            if (widget.isFirstTime) ...[
+              const SizedBox(height: 30),
+              const Divider(height: 30),
+
+              CheckboxListTile(
+                value: _hasReadInfo,
+                onChanged: (value) {
+                  setState(() {
+                    _hasReadInfo = value ?? false;
+                  });
+                },
+                title: const Text(
+                  "I have read and understood the above instructions",
+                  style: TextStyle(
+                    fontWeight: FontWeight.w500,
+                    fontSize: 14,
+                  ),
+                ),
+                controlAffinity: ListTileControlAffinity.leading,
+                contentPadding: EdgeInsets.zero,
+                activeColor: Colors.green,
+              ),
+
+              const SizedBox(height: 15),
+
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton.icon(
+                  onPressed: _hasReadInfo ? _proceedToDashboard : null,
+                  icon: const Icon(Icons.arrow_forward),
+                  label: const Text(
+                    "Proceed to Dashboard",
+                    style: TextStyle(fontSize: 16),
+                  ),
+                ),
+              ),
+            ],
 
             const SizedBox(height: 30),
           ],

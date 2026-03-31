@@ -8,6 +8,7 @@ import 'package:nit_goa_gate_app/services/user_cache.dart';
 import 'student_dashboard.dart';
 import 'warden_dashboard.dart';
 import 'profile_setup.dart';
+import 'app_info_screen.dart';
 
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
@@ -93,11 +94,11 @@ class LoginScreen extends StatelessWidget {
           "name": name,
           "email": email,
           "rollNumber": rollNumber,
-          "createdAt": Timestamp.now(),
         };
 
         if (existingRole.isEmpty) {
           userData["role"] = "student";
+          userData["createdAt"] = Timestamp.now();
         }
 
         await FirebaseFirestore.instance
@@ -145,12 +146,26 @@ class LoginScreen extends StatelessWidget {
           if (!context.mounted) return;
 
           if (isProfileComplete) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const StudentDashboard(),
-              ),
-            );
+            // Check if user has acknowledged the info screen
+            bool infoAcknowledged = cachedData?["infoAcknowledged"] == true;
+
+            if (!context.mounted) return;
+
+            if (infoAcknowledged) {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const StudentDashboard(),
+                ),
+              );
+            } else {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const AppInfoScreen(isFirstTime: true),
+                ),
+              );
+            }
           } else {
             Navigator.pushReplacement(
               context,

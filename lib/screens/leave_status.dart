@@ -15,6 +15,9 @@ class LeaveStatus extends StatefulWidget {
 
 class _LeaveStatusState extends State<LeaveStatus> {
 
+  // Only run rejected-leave cleanup once per app session
+  static bool _hasCleanedUpThisSession = false;
+
   List<DocumentSnapshot> _leaveRequests = [];
   bool _isLoading = true;
 
@@ -40,27 +43,30 @@ class _LeaveStatusState extends State<LeaveStatus> {
 
       var docs = snapshot.docs;
 
-      // Auto-delete rejected requests older than 3 days
-      DateTime now = DateTime.now();
-      List<DocumentSnapshot> toRemove = [];
-      for (var doc in docs) {
-        if (doc["status"] == "rejected") {
-          try {
-            Timestamp? rejectedAt = doc["rejectedAt"];
-            if (rejectedAt != null) {
-              Duration diff = now.difference(rejectedAt.toDate());
-              if (diff.inDays >= 2) {
-                await FirebaseFirestore.instance
-                    .collection("leave_requests")
-                    .doc(doc.id)
-                    .delete();
-                toRemove.add(doc);
+      // Auto-delete rejected requests older than 2 days (once per session)
+      if (!_hasCleanedUpThisSession) {
+        DateTime now = DateTime.now();
+        List<DocumentSnapshot> toRemove = [];
+        for (var doc in docs) {
+          if (doc["status"] == "rejected") {
+            try {
+              Timestamp? rejectedAt = doc["rejectedAt"];
+              if (rejectedAt != null) {
+                Duration diff = now.difference(rejectedAt.toDate());
+                if (diff.inDays >= 2) {
+                  await FirebaseFirestore.instance
+                      .collection("leave_requests")
+                      .doc(doc.id)
+                      .delete();
+                  toRemove.add(doc);
+                }
               }
-            }
-          } catch (_) {}
+            } catch (_) {}
+          }
         }
+        docs.removeWhere((d) => toRemove.contains(d));
+        _hasCleanedUpThisSession = true;
       }
-      docs.removeWhere((d) => toRemove.contains(d));
 
       // Sort by createdAt descending
       docs.sort((a, b) {

@@ -6,6 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:nit_goa_gate_app/services/user_cache.dart';
 import 'student_dashboard.dart';
+import 'app_info_screen.dart';
 
 class ProfileSetup extends StatefulWidget {
   final bool isFirstTime;
@@ -226,7 +227,7 @@ class _ProfileSetupState extends State<ProfileSetup> {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => const StudentDashboard(),
+            builder: (context) => const AppInfoScreen(isFirstTime: true),
           ),
         );
       } else if (mounted) {

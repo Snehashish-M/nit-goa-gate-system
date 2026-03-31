@@ -7,6 +7,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:intl/intl.dart';
 
 import 'login_screen.dart';
+import 'package:nit_goa_gate_app/services/user_cache.dart';
 
 class WardenDashboard extends StatefulWidget {
   const WardenDashboard({super.key});
@@ -51,26 +52,17 @@ class _WardenDashboardState extends State<WardenDashboard>
   // ─── Load saved hostel preference ───
 
   Future<void> _loadSavedHostel() async {
-    User? user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+    // Use cached profile data instead of a separate Firestore read
+    var cachedData = UserCache().profileData;
 
-    try {
-      var doc = await FirebaseFirestore.instance
-          .collection("users")
-          .doc(user.uid)
-          .get();
-
-      if (doc.exists && doc.data()!.containsKey("wardenHostel")) {
-        String saved = doc["wardenHostel"];
-        if (_hostels.contains(saved)) {
-          setState(() => _selectedHostel = saved);
-          _fetchPendingRequests();
-          _fetchExtensionRequests();
-          return;
-        }
+    if (cachedData != null && cachedData.containsKey("wardenHostel")) {
+      String saved = cachedData["wardenHostel"];
+      if (_hostels.contains(saved)) {
+        setState(() => _selectedHostel = saved);
+        _fetchPendingRequests();
+        _fetchExtensionRequests();
+        return;
       }
-    } catch (e) {
-      debugPrint("Error loading saved hostel: $e");
     }
 
     // No saved preference — just show the dropdown
