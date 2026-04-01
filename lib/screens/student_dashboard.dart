@@ -65,6 +65,26 @@ class _StudentDashboardState extends State<StudentDashboard> {
         ),
       );
     } else if (value == "logout") {
+      final shouldLogout = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text("Confirm Logout"),
+          content: const Text("Are you sure you want to log out?"),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text("Cancel"),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text("Log Out"),
+            ),
+          ],
+        ),
+      );
+
+      if (shouldLogout != true) return;
+
       UserCache().clear();
       await GoogleSignIn().signOut();
       await FirebaseAuth.instance.signOut();
@@ -97,7 +117,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
                 value: "edit_profile",
                 child: Row(
                   children: [
-                    Icon(Icons.edit, size: 20),
+                    Icon(Icons.edit, size: 20, color: Colors.blueGrey),
                     SizedBox(width: 10),
                     Text("Edit Profile"),
                   ],
@@ -107,7 +127,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
                 value: "info",
                 child: Row(
                   children: [
-                    Icon(Icons.info_outline, size: 20),
+                    Icon(Icons.info_outline, size: 20, color: Colors.blueGrey),
                     SizedBox(width: 10),
                     Text("Information"),
                   ],
@@ -117,7 +137,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
                 value: "logout",
                 child: Row(
                   children: [
-                    Icon(Icons.logout, size: 20),
+                    Icon(Icons.logout, size: 20, color: Colors.blueGrey),
                     SizedBox(width: 10),
                     Text("Log Out"),
                   ],
@@ -156,71 +176,79 @@ class _StudentDashboardState extends State<StudentDashboard> {
 
             const SizedBox(height: 40),
 
-            ElevatedButton.icon(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const DayScholar(),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.school),
-              label: const Text("Day Scholar"),
-            ),
-
-            const SizedBox(height: 15),
-
-            ElevatedButton.icon(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const HostelExit(),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.meeting_room),
-              label: const Text("Hostel Entry / Exit"),
-            ),
-
-            const SizedBox(height: 15),
-
-            ElevatedButton.icon(
-              onPressed: () {
-                var data = UserCache().profileData;
-                if (data != null && data["hostel"] == "Day Scholar") {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text("Leave applications are only for hostel residents."),
+            SizedBox(
+              width: 250,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const DayScholar(),
                     ),
                   );
-                  return;
-                }
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const LeaveApplication(),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.description),
-              label: const Text("Leave Application"),
+                },
+                child: const Text("Day Scholar"),
+              ),
             ),
 
             const SizedBox(height: 15),
 
-            ElevatedButton.icon(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const LeaveStatus(),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.fact_check),
-              label: const Text("Leave Status"),
+            SizedBox(
+              width: 250,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const HostelExit(),
+                    ),
+                  );
+                },
+                child: const Text("Hostel Entry / Exit"),
+              ),
+            ),
+
+            const SizedBox(height: 15),
+
+            SizedBox(
+              width: 250,
+              child: ElevatedButton(
+                onPressed: () {
+                  var data = UserCache().profileData;
+                  if (data != null && data["hostel"] == "Day Scholar") {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text("Leave applications are only for hostel residents."),
+                      ),
+                    );
+                    return;
+                  }
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const LeaveApplication(),
+                    ),
+                  );
+                },
+                child: const Text("Leave Application"),
+              ),
+            ),
+
+            const SizedBox(height: 15),
+
+            SizedBox(
+              width: 250,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const LeaveStatus(),
+                    ),
+                  );
+                },
+                child: const Text("Leave Status"),
+              ),
             ),
 
           ],

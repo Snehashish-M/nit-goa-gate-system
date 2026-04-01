@@ -226,6 +226,10 @@ class _DayScholarState extends State<DayScholar> {
                       child: QrImageView(
                         data: qrData!,
                         size: 250,
+                        embeddedImage: const AssetImage('assets/images/logo.png'),
+                        embeddedImageStyle: const QrEmbeddedImageStyle(
+                          size: Size(40, 40),
+                        ),
                       ),
                     ),
 

@@ -226,6 +226,10 @@ class _HostelExitState extends State<HostelExit> {
                       child: QrImageView(
                         data: qrData!,
                         size: 250,
+                        embeddedImage: const AssetImage('assets/images/logo.png'),
+                        embeddedImageStyle: const QrEmbeddedImageStyle(
+                          size: Size(40, 40),
+                        ),
                       ),
                     ),
 

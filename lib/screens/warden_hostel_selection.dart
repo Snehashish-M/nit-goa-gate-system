@@ -45,7 +45,7 @@ class WardenHostelSelection extends StatelessWidget {
                     Navigator.pushReplacement(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => const WardenDashboard(hostel: "Talpona Hostel"),
+                        builder: (context) => const WardenDashboard(),
                       ),
                     );
                   },
@@ -67,7 +67,7 @@ class WardenHostelSelection extends StatelessWidget {
                     Navigator.pushReplacement(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => const WardenDashboard(hostel: "Terekhol Hostel"),
+                        builder: (context) => const WardenDashboard(),
                       ),
                     );
                   },

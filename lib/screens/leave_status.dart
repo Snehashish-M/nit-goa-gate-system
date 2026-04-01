@@ -810,6 +810,10 @@ class _ApprovedLeaveWidgetState extends State<_ApprovedLeaveWidget> {
           QrImageView(
             data: widget.passId,
             size: 250,
+            embeddedImage: const AssetImage('assets/images/logo.png'),
+            embeddedImageStyle: const QrEmbeddedImageStyle(
+              size: Size(40, 40),
+            ),
           ),
 
           if (canApplyExtension) ...[

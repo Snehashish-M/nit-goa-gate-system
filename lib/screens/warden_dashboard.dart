@@ -505,6 +505,7 @@ class _WardenDashboardState extends State<WardenDashboard>
                           ? Icons.radio_button_checked
                           : Icons.radio_button_unchecked,
                       size: 20,
+                      color: Colors.blueGrey,
                     ),
                     const SizedBox(width: 10),
                     Text(hostel),
@@ -516,6 +517,26 @@ class _WardenDashboardState extends State<WardenDashboard>
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {
+              final shouldLogout = await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text("Confirm Logout"),
+                  content: const Text("Are you sure you want to log out?"),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: const Text("Cancel"),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: const Text("Log Out"),
+                    ),
+                  ],
+                ),
+              );
+
+              if (shouldLogout != true) return;
+
               await GoogleSignIn().signOut();
               await FirebaseAuth.instance.signOut();
               if (!context.mounted) return;

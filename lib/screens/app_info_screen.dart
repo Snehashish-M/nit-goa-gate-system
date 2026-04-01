@@ -68,9 +68,9 @@ class _AppInfoScreenState extends State<AppInfoScreen> {
 
             _buildSection(
               icon: Icons.qr_code_2,
-              title: "Hostel Entry / Exit QR",
+              title: "Hostel / Day Scholar Entry-Exit QR",
               points: [
-                "The same QR code is used for both leaving and entering the campus.",
+                "Enter the destination you are going OR coming from (for day scholar) and click generate to get your gate QR code.",
                 "Once the QR is scanned a second time (i.e., you have re-entered the campus), the QR automatically disappears.",
                 "If you generate a QR by mistake, don't worry — all hostel and day scholar QR codes are automatically cleared at 12:00 AM every night.",
                 "Alternatively, you can scan the QR twice at the main gate to remove an unwanted QR and generate a new one.",
