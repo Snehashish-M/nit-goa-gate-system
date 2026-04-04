@@ -188,37 +188,189 @@ class LoginScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
 
-    return Theme(
-      data: ThemeData.light(),
-      child: Scaffold(
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+    return Scaffold(
+      backgroundColor: const Color(0xFF0D1B2A),
+      body: Column(
+        children: [
+          // ─── Top: Building image with rounded bottom ───
+          Stack(
+            clipBehavior: Clip.none,
             children: [
+              ClipRRect(
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(36),
+                  bottomRight: Radius.circular(36),
+                ),
+                child: SizedBox(
+                  height: screenHeight * 0.45,
+                  width: double.infinity,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Image.asset(
+                        'assets/images/image.png',
+                        fit: BoxFit.cover,
+                        alignment: Alignment.topCenter,
+                      ),
+                      // Subtle overlay just at edges
+                      Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            stops: const [0.0, 0.15, 0.85, 1.0],
+                            colors: [
+                              const Color(0xFF0D1B2A).withOpacity(0.4),
+                              Colors.transparent,
+                              Colors.transparent,
+                              const Color(0xFF0D1B2A).withOpacity(0.6),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
 
-            const Icon(Icons.security, size: 64, color: Colors.blueGrey),
+              // Logo at the boundary
+              Positioned(
+                bottom: -45,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF0D1B2A).withOpacity(0.5),
+                          blurRadius: 20,
+                          spreadRadius: 4,
+                        ),
+                      ],
+                    ),
+                    child: ClipOval(
+                      child: Image.asset(
+                        'assets/images/logo.png',
+                        width: 78,
+                        height: 78,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
 
-            const SizedBox(height: 20),
+          // ─── Bottom: Navy blue section ───
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 36),
+              child: Column(
+                children: [
+                  // Space for logo
+                  const SizedBox(height: 55),
 
-            const Text(
-              "NIT Goa Gate System",
-              style: TextStyle(
-                fontSize: 26,
-                fontWeight: FontWeight.bold,
+                  const Text(
+                    "NIT Goa",
+                    style: TextStyle(
+                      fontSize: 30,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      letterSpacing: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    "Gate Management System",
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: Colors.white.withOpacity(0.55),
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+
+                  const Spacer(),
+
+                  // Welcome text
+                  const Text(
+                    "Welcome",
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    "Sign in with your college email to continue",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.white.withOpacity(0.45),
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Google sign-in button
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: ElevatedButton(
+                      onPressed: () => signInWithGoogle(context),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: const Color(0xFF0D1B2A),
+                        elevation: 8,
+                        shadowColor: Colors.black.withOpacity(0.3),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Image.asset('assets/images/google_logo.png', height: 24, width: 24),
+                          SizedBox(width: 10),
+                          Text(
+                            "Sign in with Google",
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const Spacer(),
+
+                  // Footer
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 20),
+                    child: Text(
+                      "National Institute of Technology, Goa",
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.white.withOpacity(0.3),
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-
-            const SizedBox(height: 40),
-
-            ElevatedButton.icon(
-              onPressed: () => signInWithGoogle(context),
-              icon: const Icon(Icons.login),
-              label: const Text("Sign in with Google"),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
-    ));
+    );
   }
 }

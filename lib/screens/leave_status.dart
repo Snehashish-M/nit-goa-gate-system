@@ -439,6 +439,7 @@ class _LeaveStatusState extends State<LeaveStatus> {
                                   _ApprovedLeaveWidget(
                                     passId: leaveRequest.id,
                                     leavingDate: leavingDate,
+                                    returnDate: returnDate,
                                     extensionStatus: extensionStatus,
                                   )
 
@@ -525,11 +526,13 @@ class _ApprovedLeaveWidget extends StatefulWidget {
 
   final String passId;
   final DateTime? leavingDate;
+  final DateTime? returnDate;
   final String? extensionStatus;
 
   const _ApprovedLeaveWidget({
     required this.passId,
     this.leavingDate,
+    this.returnDate,
     this.extensionStatus,
   });
 
@@ -574,74 +577,250 @@ class _ApprovedLeaveWidgetState extends State<_ApprovedLeaveWidget> {
     _selectedNewReturnDate = null;
     _reasonController.clear();
 
+    final currentReturnDate = widget.returnDate;
+    final navyBlue = const Color(0xFF0D1B2A);
+
     showDialog(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text("Apply for Extension"),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(
-                    _selectedNewReturnDate == null
-                        ? "Select New Return Date"
-                        : DateFormat('yyyy-MM-dd').format(_selectedNewReturnDate!),
+        builder: (context, setDialogState) => Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: navyBlue.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(Icons.date_range, color: navyBlue, size: 24),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          "Apply for Extension",
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  trailing: const Icon(Icons.calendar_today),
-                  onTap: () async {
-                    DateTime? picked = await showDatePicker(
-                      context: context,
-                      initialDate: DateTime.now().add(const Duration(days: 1)),
-                      firstDate: DateTime.now(),
-                      lastDate: DateTime(2030),
-                    );
-                    if (picked != null) {
-                      setDialogState(() {
-                        _selectedNewReturnDate = picked;
-                      });
-                    }
-                  },
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: _reasonController,
-                  decoration: const InputDecoration(
-                    labelText: "Reason for Extension",
-                    prefixIcon: Icon(Icons.edit_note),
+
+                  const SizedBox(height: 20),
+
+                  // Current return date info card
+                  if (currentReturnDate != null)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.info_outline, color: Colors.orange, size: 20),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: RichText(
+                              text: TextSpan(
+                                style: const TextStyle(fontSize: 13, color: Colors.black87),
+                                children: [
+                                  const TextSpan(text: "Current return date: "),
+                                  TextSpan(
+                                    text: DateFormat('dd MMM yyyy').format(currentReturnDate),
+                                    style: const TextStyle(fontWeight: FontWeight.bold),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                  const SizedBox(height: 20),
+
+                  // New return date picker
+                  const Text(
+                    "New Return Date",
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey),
                   ),
-                  maxLines: 3,
-                ),
-              ],
+                  const SizedBox(height: 8),
+                  InkWell(
+                    onTap: () async {
+                      // initialDate = current return date + 1 day (so student sees where they are)
+                      final initDate = currentReturnDate != null
+                          ? currentReturnDate.add(const Duration(days: 1))
+                          : DateTime.now().add(const Duration(days: 1));
+
+                      DateTime? picked = await showDatePicker(
+                        context: context,
+                        initialDate: initDate,
+                        firstDate: DateTime.now(),
+                        lastDate: DateTime(2030),
+                        builder: (context, child) {
+                          return Theme(
+                            data: Theme.of(context).copyWith(
+                              colorScheme: ColorScheme.light(
+                                primary: navyBlue,
+                                onPrimary: Colors.white,
+                                surface: Colors.white,
+                              ),
+                            ),
+                            child: child!,
+                          );
+                        },
+                      );
+                      if (picked != null) {
+                        setDialogState(() {
+                          _selectedNewReturnDate = picked;
+                        });
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color: _selectedNewReturnDate != null ? navyBlue : Colors.grey.shade300,
+                          width: _selectedNewReturnDate != null ? 1.5 : 1,
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                        color: _selectedNewReturnDate != null
+                            ? navyBlue.withOpacity(0.04)
+                            : Colors.grey.shade50,
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.calendar_today,
+                            size: 20,
+                            color: _selectedNewReturnDate != null ? navyBlue : Colors.grey,
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            _selectedNewReturnDate == null
+                                ? "Tap to select date"
+                                : DateFormat('dd MMM yyyy').format(_selectedNewReturnDate!),
+                            style: TextStyle(
+                              fontSize: 15,
+                              color: _selectedNewReturnDate != null ? navyBlue : Colors.grey.shade600,
+                              fontWeight: _selectedNewReturnDate != null
+                                  ? FontWeight.w600
+                                  : FontWeight.normal,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // Reason text field
+                  const Text(
+                    "Reason for Extension",
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _reasonController,
+                    decoration: InputDecoration(
+                      hintText: "Why do you need an extension?",
+                      hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
+                      filled: true,
+                      fillColor: Colors.grey.shade50,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: navyBlue, width: 1.5),
+                      ),
+                      contentPadding: const EdgeInsets.all(14),
+                    ),
+                    maxLines: 3,
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Action buttons
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(dialogContext),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            side: BorderSide(color: Colors.grey.shade300),
+                          ),
+                          child: const Text(
+                            "Cancel",
+                            style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            if (_selectedNewReturnDate == null) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text("Please select a new return date")),
+                              );
+                              return;
+                            }
+                            if (_reasonController.text.trim().isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text("Please enter a reason")),
+                              );
+                              return;
+                            }
+                            Navigator.pop(dialogContext);
+                            _submitExtension();
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: navyBlue,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: const Text(
+                            "Submit",
+                            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text("Cancel"),
-            ),
-            TextButton(
-              onPressed: () {
-                if (_selectedNewReturnDate == null) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Please select a new return date")),
-                  );
-                  return;
-                }
-                if (_reasonController.text.trim().isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Please enter a reason")),
-                  );
-                  return;
-                }
-                Navigator.pop(dialogContext);
-                _submitExtension();
-              },
-              child: const Text("Submit"),
-            ),
-          ],
         ),
       ),
     );
@@ -682,92 +861,172 @@ class _ApprovedLeaveWidgetState extends State<_ApprovedLeaveWidget> {
 
     showDialog(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text("Delete Leave QR"),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.red.withValues(alpha: 0.1),
-                border: Border.all(color: Colors.red),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Row(
+      builder: (dialogContext) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header
+              Row(
                 children: [
-                  Icon(Icons.warning, color: Colors.red),
-                  SizedBox(width: 10),
-                  Expanded(
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.delete_forever, color: Colors.red, size: 24),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
                     child: Text(
-                      "Delete this QR only if you are NOT going on leave. If you have already left the campus using this QR, DO NOT delete it — you will need it to re-enter.",
+                      "Delete Leave QR",
                       style: TextStyle(
-                        color: Colors.red,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
                 ],
               ),
-            ),
-            const SizedBox(height: 15),
-            const Text(
-              "Type  delete_qr  to confirm:",
-              style: TextStyle(fontSize: 14),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: confirmController,
-              decoration: const InputDecoration(
-                hintText: "delete_qr",
-                border: OutlineInputBorder(),
-                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+
+              const SizedBox(height: 20),
+
+              // Warning card
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.06),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.red.withOpacity(0.25)),
+                ),
+                child: const Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.warning_amber_rounded, color: Colors.red, size: 20),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        "Delete this QR only if you are NOT going on leave. If you have already left campus using this QR, DO NOT delete it — you will need it to re-enter.",
+                        style: TextStyle(
+                          color: Colors.red,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w500,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+
+              const SizedBox(height: 20),
+
+              // Confirmation input
+              const Text(
+                "Type  delete_qr  to confirm",
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: confirmController,
+                decoration: InputDecoration(
+                  hintText: "delete_qr",
+                  hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
+                  filled: true,
+                  fillColor: Colors.grey.shade50,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Colors.red, width: 1.5),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              // Action buttons
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(dialogContext),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        side: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      child: const Text(
+                        "Cancel",
+                        style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        if (confirmController.text.trim() != "delete_qr") {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text("Please type 'delete_qr' to confirm")),
+                          );
+                          return;
+                        }
+                        Navigator.pop(dialogContext);
+
+                        try {
+                          await FirebaseFirestore.instance
+                              .collection("leave_requests")
+                              .doc(widget.passId)
+                              .delete();
+
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text("Leave QR deleted successfully")),
+                            );
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text("Error: ${e.toString()}")),
+                            );
+                          }
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: const Text(
+                        "Delete",
+                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text("Cancel"),
-          ),
-          TextButton(
-            onPressed: () async {
-              if (confirmController.text.trim() != "delete_qr") {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("Please type 'delete_qr' to confirm")),
-                );
-                return;
-              }
-              Navigator.pop(dialogContext);
-
-              try {
-                await FirebaseFirestore.instance
-                    .collection("leave_requests")
-                    .doc(widget.passId)
-                    .delete();
-
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Leave QR deleted successfully")),
-                  );
-                }
-              } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text("Error: ${e.toString()}")),
-                  );
-                }
-              }
-            },
-            child: const Text(
-              "Delete",
-              style: TextStyle(color: Colors.red),
-            ),
-          ),
-        ],
       ),
     );
   }
