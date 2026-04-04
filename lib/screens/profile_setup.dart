@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:image_cropper/image_cropper.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:nit_goa_gate_app/services/user_cache.dart';
@@ -90,7 +92,28 @@ class _ProfileSetupState extends State<ProfileSetup> {
 
     if (picked != null) {
 
-      final bytes = await picked.readAsBytes();
+      // Open cropper
+      final croppedFile = await ImageCropper().cropImage(
+        sourcePath: picked.path,
+        aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
+        compressQuality: 85,
+        maxWidth: 500,
+        maxHeight: 500,
+        uiSettings: [
+          AndroidUiSettings(
+            toolbarTitle: 'Crop Photo',
+            toolbarColor: const Color(0xFF0D1B2A),
+            toolbarWidgetColor: Colors.white,
+            activeControlsWidgetColor: const Color(0xFF1976D2),
+            initAspectRatio: CropAspectRatioPreset.square,
+            lockAspectRatio: false,
+          ),
+        ],
+      );
+
+      if (croppedFile == null) return;
+
+      final bytes = await File(croppedFile.path).readAsBytes();
       final sizeKB = bytes.length / 1024;
 
       if (sizeKB > 100) {
@@ -304,10 +327,15 @@ class _ProfileSetupState extends State<ProfileSetup> {
                                   ),
                                   body: Center(
                                     child: InteractiveViewer(
-                                      child: Image.memory(
-                                        displayBytes,
-                                        fit: BoxFit.contain,
-                                        width: double.infinity,
+                                      child: ConstrainedBox(
+                                        constraints: BoxConstraints(
+                                          maxHeight: MediaQuery.of(context).size.height * 0.5,
+                                        ),
+                                        child: Image.memory(
+                                          displayBytes,
+                                          fit: BoxFit.contain,
+                                          width: double.infinity,
+                                        ),
                                       ),
                                     ),
                                   ),

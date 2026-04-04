@@ -193,10 +193,15 @@ class _WardenDashboardState extends State<WardenDashboard>
                 ),
                 body: Center(
                   child: InteractiveViewer(
-                    child: Image.memory(
-                      photoBytes!,
-                      fit: BoxFit.contain,
-                      width: double.infinity,
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxHeight: MediaQuery.of(context).size.height * 0.5,
+                      ),
+                      child: Image.memory(
+                        photoBytes!,
+                        fit: BoxFit.contain,
+                        width: double.infinity,
+                      ),
                     ),
                   ),
                 ),
@@ -481,6 +486,43 @@ class _WardenDashboardState extends State<WardenDashboard>
     }
   }
 
+  // ─── Badge helper ───
+
+  Widget _buildBadgedIcon(IconData iconData, int count) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Icon(iconData),
+        if (count > 0)
+          Positioned(
+            right: -8,
+            top: -4,
+            child: Container(
+              padding: const EdgeInsets.all(2),
+              decoration: const BoxDecoration(
+                color: Colors.red,
+                shape: BoxShape.circle,
+              ),
+              constraints: const BoxConstraints(
+                minWidth: 18,
+                minHeight: 18,
+              ),
+              child: Center(
+                child: Text(
+                  '$count',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
   // ─── Build ───
 
   @override
@@ -550,13 +592,13 @@ class _WardenDashboardState extends State<WardenDashboard>
         ],
         bottom: TabBar(
           controller: _tabController,
-          tabs: const [
+          tabs: [
             Tab(
-              icon: Icon(Icons.description),
+              icon: _buildBadgedIcon(Icons.description, _pendingRequests.length),
               text: "Leave Requests",
             ),
             Tab(
-              icon: Icon(Icons.date_range),
+              icon: _buildBadgedIcon(Icons.date_range, _extensionRequests.length),
               text: "Extensions",
             ),
           ],
