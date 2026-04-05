@@ -1,6 +1,6 @@
 {
-    "name": "nit_goa_gate_app",
-    "short_name": "nit_goa_gate_app",
+    "name": "HostelGate",
+    "short_name": "HostelGate",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

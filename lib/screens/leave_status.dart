@@ -163,6 +163,34 @@ class _LeaveStatusState extends State<LeaveStatus> {
               Text("Address During Leave: ${leaveRequest["addressDuringLeave"]}"),
               Text("Parent Phone: ${leaveRequest["parentPhone"]}"),
 
+              // Warden action info
+              Builder(
+                builder: (context) {
+                  String status = leaveRequest["status"] ?? "pending";
+                  String? actionBy;
+                  try {
+                    if (status == "approved") {
+                      actionBy = leaveRequest["approvedBy"];
+                    } else if (status == "rejected") {
+                      actionBy = leaveRequest["rejectedBy"];
+                    }
+                  } catch (_) {}
+                  if (actionBy != null && actionBy.isNotEmpty) {
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 10),
+                      child: Text(
+                        "${status == 'approved' ? 'Approved' : 'Rejected'} by: $actionBy",
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: status == 'approved' ? Colors.green : Colors.red,
+                        ),
+                      ),
+                    );
+                  }
+                  return const SizedBox.shrink();
+                },
+              ),
+
               // Extension status in details
               if (extensionStatus != null) ...[
                 const SizedBox(height: 10),
@@ -176,6 +204,30 @@ class _LeaveStatusState extends State<LeaveStatus> {
                             ? Colors.red
                             : Colors.orange,
                   ),
+                ),
+                // Extension warden name
+                Builder(
+                  builder: (context) {
+                    String? extBy;
+                    try {
+                      if (extensionStatus == "approved") {
+                        extBy = leaveRequest["extensionApprovedBy"];
+                      } else if (extensionStatus == "rejected") {
+                        extBy = leaveRequest["extensionRejectedBy"];
+                      }
+                    } catch (_) {}
+                    if (extBy != null && extBy.isNotEmpty) {
+                      return Text(
+                        "Extension ${extensionStatus == 'approved' ? 'approved' : 'rejected'} by: $extBy",
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontStyle: FontStyle.italic,
+                          color: extensionStatus == 'approved' ? Colors.green : Colors.red,
+                        ),
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  },
                 ),
               ],
 
@@ -284,6 +336,16 @@ class _LeaveStatusState extends State<LeaveStatus> {
                         extensionStatus = leaveRequest["extensionStatus"];
                       } catch (_) {}
 
+                      // Get warden name
+                      String? actionBy;
+                      try {
+                        if (status == "approved") {
+                          actionBy = leaveRequest["approvedBy"];
+                        } else if (status == "rejected") {
+                          actionBy = leaveRequest["rejectedBy"];
+                        }
+                      } catch (_) {}
+
                       String purpose = leaveRequest["purpose"] ?? "N/A";
 
                       Color statusColor;
@@ -377,6 +439,19 @@ class _LeaveStatusState extends State<LeaveStatus> {
                                   "Purpose: $purpose",
                                   style: const TextStyle(fontSize: 14),
                                 ),
+
+                                // Warden name
+                                if (actionBy != null && actionBy.isNotEmpty) ...[
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    "${status == 'approved' ? 'Approved' : 'Rejected'} by: $actionBy",
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontStyle: FontStyle.italic,
+                                      color: status == 'approved' ? Colors.green.shade700 : Colors.red.shade700,
+                                    ),
+                                  ),
+                                ],
 
                                 // Extension status badge
                                 if (extensionStatus != null) ...[

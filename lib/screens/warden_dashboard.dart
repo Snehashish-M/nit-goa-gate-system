@@ -23,13 +23,20 @@ class _WardenDashboardState extends State<WardenDashboard>
 
   List<DocumentSnapshot> _pendingRequests = [];
   List<DocumentSnapshot> _extensionRequests = [];
+  List<DocumentSnapshot> _historyRequests = [];
+  List<DocumentSnapshot> _extensionHistoryRequests = [];
   bool _isLoadingLeaves = true;
   bool _isLoadingExtensions = true;
+  bool _isLoadingHistory = true;
+  bool _isLoadingExtHistory = true;
+  int _historyToggle = 0; // 0 = Leave, 1 = Extension
 
   String _leaveSearchQuery = "";
   String _extensionSearchQuery = "";
+  String _historySearchQuery = "";
   final _leaveSearchController = TextEditingController();
   final _extensionSearchController = TextEditingController();
+  final _historySearchController = TextEditingController();
 
   String? _selectedHostel;
   final List<String> _hostels = ["Talpona Hostel", "Terekhol Hostel"];
@@ -37,7 +44,7 @@ class _WardenDashboardState extends State<WardenDashboard>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _loadSavedHostel();
   }
 
@@ -46,6 +53,7 @@ class _WardenDashboardState extends State<WardenDashboard>
     _tabController.dispose();
     _leaveSearchController.dispose();
     _extensionSearchController.dispose();
+    _historySearchController.dispose();
     super.dispose();
   }
 
@@ -61,6 +69,9 @@ class _WardenDashboardState extends State<WardenDashboard>
         setState(() => _selectedHostel = saved);
         _fetchPendingRequests();
         _fetchExtensionRequests();
+        _fetchHistory();
+        _fetchExtensionHistory();
+        _cleanupOldHistory(); // Delete entries older than 7 days from Firebase
         return;
       }
     }
@@ -69,6 +80,8 @@ class _WardenDashboardState extends State<WardenDashboard>
     setState(() {
       _isLoadingLeaves = false;
       _isLoadingExtensions = false;
+      _isLoadingHistory = false;
+      _isLoadingExtHistory = false;
     });
   }
 
@@ -87,6 +100,9 @@ class _WardenDashboardState extends State<WardenDashboard>
 
     _fetchPendingRequests();
     _fetchExtensionRequests();
+    _fetchHistory();
+    _fetchExtensionHistory();
+    _cleanupOldHistory();
   }
 
   // ─── Fetch leave requests ───
@@ -224,23 +240,106 @@ class _WardenDashboardState extends State<WardenDashboard>
     return _buildStudentAvatar(photoBase64, radius: radius);
   }
 
+  // ─── Helpers ───
+
+  String? _safeGet(DocumentSnapshot doc, String field) {
+    try {
+      return doc[field]?.toString();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // ─── Save to leave_history collection ───
+
+  Future<void> _saveToHistory({
+    required String type, // "leave" or "extension"
+    required String status, // "approved" or "rejected"
+    required String actionBy,
+    required Timestamp actionAt,
+    required DocumentSnapshot request,
+    String? rejectionReason,
+    String? extensionReason,
+    Timestamp? extensionNewReturnDate,
+  }) async {
+    try {
+      Map<String, dynamic> historyData = {
+        "type": type,
+        "status": status,
+        "actionBy": actionBy,
+        "actionAt": actionAt,
+        "name": _safeGet(request, "name") ?? "",
+        "rollNumber": _safeGet(request, "rollNumber") ?? "",
+        "degree": _safeGet(request, "degree") ?? "",
+        "hostel": _safeGet(request, "hostel") ?? "",
+        "roomNumber": _safeGet(request, "roomNumber") ?? "",
+        "phone": _safeGet(request, "phone") ?? "",
+        "purpose": _safeGet(request, "purpose") ?? "",
+        "modeOfTransport": _safeGet(request, "modeOfTransport") ?? "",
+        "addressDuringLeave": _safeGet(request, "addressDuringLeave") ?? "",
+        "parentPhone": _safeGet(request, "parentPhone") ?? "",
+      };
+
+      // Dates
+      try { historyData["leavingDate"] = request["leavingDate"]; } catch (_) {}
+      try { historyData["returnDate"] = request["returnDate"]; } catch (_) {}
+      try { historyData["durationDays"] = request["durationDays"]; } catch (_) {}
+
+      // Photo — save for avatar display
+      try { historyData["photo"] = request["photo"]; } catch (_) {}
+
+      if (rejectionReason != null && rejectionReason.trim().isNotEmpty) {
+        historyData["rejectionReason"] = rejectionReason.trim();
+      }
+      if (extensionReason != null) {
+        historyData["extensionReason"] = extensionReason;
+      }
+      if (extensionNewReturnDate != null) {
+        historyData["extensionNewReturnDate"] = extensionNewReturnDate;
+      }
+
+      await FirebaseFirestore.instance
+          .collection("leave_history")
+          .add(historyData);
+    } catch (e) {
+      debugPrint("Error saving to history: $e");
+    }
+  }
+
   // ─── Leave request approve / reject ───
 
   Future approveRequest(BuildContext context, DocumentSnapshot request) async {
+    String wardenName = FirebaseAuth.instance.currentUser?.displayName ?? "Warden";
+    Timestamp now = Timestamp.now();
     await FirebaseFirestore.instance
         .collection("leave_requests")
         .doc(request.id)
         .update({
       "status": "approved",
+      "approvedBy": wardenName,
+      "approvedAt": now,
     });
 
+    // Save to history collection
+    await _saveToHistory(
+      type: "leave",
+      status: "approved",
+      actionBy: wardenName,
+      actionAt: now,
+      request: request,
+    );
+
     _fetchPendingRequests();
+    _fetchHistory();
   }
 
   Future rejectRequest(BuildContext context, DocumentSnapshot request, {String? reason}) async {
+    String wardenName = FirebaseAuth.instance.currentUser?.displayName ?? "Warden";
+    Timestamp now = Timestamp.now();
     Map<String, dynamic> updateData = {
       "status": "rejected",
-      "rejectedAt": Timestamp.now(),
+      "rejectedAt": now,
+      "rejectedBy": wardenName,
     };
     if (reason != null && reason.trim().isNotEmpty) {
       updateData["rejectionReason"] = reason.trim();
@@ -251,7 +350,18 @@ class _WardenDashboardState extends State<WardenDashboard>
         .doc(request.id)
         .update(updateData);
 
+    // Save to history collection
+    await _saveToHistory(
+      type: "leave",
+      status: "rejected",
+      actionBy: wardenName,
+      actionAt: now,
+      request: request,
+      rejectionReason: reason,
+    );
+
     _fetchPendingRequests();
+    _fetchHistory();
   }
 
   void showApproveConfirmation(BuildContext context, DocumentSnapshot request) {
@@ -427,13 +537,14 @@ class _WardenDashboardState extends State<WardenDashboard>
 
   Future _approveExtension(DocumentSnapshot extRequest) async {
     try {
+      String wardenName = FirebaseAuth.instance.currentUser?.displayName ?? "Warden";
+      Timestamp now = Timestamp.now();
       Timestamp newReturnDate = extRequest["extensionNewReturnDate"];
       Timestamp leavingDateTs = extRequest["leavingDate"];
       DateTime leavingDate = leavingDateTs.toDate();
       DateTime newReturn = newReturnDate.toDate();
       int newDuration = newReturn.difference(leavingDate).inDays + 1;
 
-      // Update the same leave request doc
       await FirebaseFirestore.instance
           .collection("leave_requests")
           .doc(extRequest.id)
@@ -442,7 +553,20 @@ class _WardenDashboardState extends State<WardenDashboard>
         "durationDays": newDuration,
         "extended": true,
         "extensionStatus": "approved",
+        "extensionApprovedBy": wardenName,
+        "extensionApprovedAt": now,
       });
+
+      // Save to history collection
+      await _saveToHistory(
+        type: "extension",
+        status: "approved",
+        actionBy: wardenName,
+        actionAt: now,
+        request: extRequest,
+        extensionReason: _safeGet(extRequest, "extensionReason"),
+        extensionNewReturnDate: newReturnDate,
+      );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -451,6 +575,7 @@ class _WardenDashboardState extends State<WardenDashboard>
       }
 
       _fetchExtensionRequests();
+      _fetchExtensionHistory();
     } catch (e) {
       debugPrint("Error approving extension: $e");
       if (mounted) {
@@ -463,11 +588,26 @@ class _WardenDashboardState extends State<WardenDashboard>
 
   Future _rejectExtension(DocumentSnapshot extRequest) async {
     try {
-      // Update extension status on the same leave request doc
+      String wardenName = FirebaseAuth.instance.currentUser?.displayName ?? "Warden";
+      Timestamp now = Timestamp.now();
       await FirebaseFirestore.instance
           .collection("leave_requests")
           .doc(extRequest.id)
-          .update({"extensionStatus": "rejected"});
+          .update({
+        "extensionStatus": "rejected",
+        "extensionRejectedBy": wardenName,
+        "extensionRejectedAt": now,
+      });
+
+      // Save to history collection
+      await _saveToHistory(
+        type: "extension",
+        status: "rejected",
+        actionBy: wardenName,
+        actionAt: now,
+        request: extRequest,
+        extensionReason: _safeGet(extRequest, "extensionReason"),
+      );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -476,6 +616,7 @@ class _WardenDashboardState extends State<WardenDashboard>
       }
 
       _fetchExtensionRequests();
+      _fetchExtensionHistory();
     } catch (e) {
       debugPrint("Error rejecting extension: $e");
       if (mounted) {
@@ -601,6 +742,10 @@ class _WardenDashboardState extends State<WardenDashboard>
               icon: _buildBadgedIcon(Icons.date_range, _extensionRequests.length),
               text: "Extensions",
             ),
+            const Tab(
+              icon: Icon(Icons.history),
+              text: "History",
+            ),
           ],
         ),
       ),
@@ -612,6 +757,8 @@ class _WardenDashboardState extends State<WardenDashboard>
           _buildLeaveRequestsTab(),
           // Tab 2: Extension Requests
           _buildExtensionRequestsTab(),
+          // Tab 3: History
+          _buildHistoryTab(),
         ],
       ),
 
@@ -947,6 +1094,594 @@ class _WardenDashboardState extends State<WardenDashboard>
                 ),
               ],
             ),
+    );
+  }
+
+  // ─── Cleanup: delete history older than 7 days from Firebase ───
+
+  Future<void> _cleanupOldHistory() async {
+    try {
+      DateTime oneWeekAgo = DateTime.now().subtract(const Duration(days: 7));
+
+      var snapshot = await FirebaseFirestore.instance
+          .collection("leave_history")
+          .get();
+
+      WriteBatch batch = FirebaseFirestore.instance.batch();
+      int deleteCount = 0;
+
+      for (var doc in snapshot.docs) {
+        try {
+          Timestamp actionAt = doc["actionAt"];
+          if (actionAt.toDate().isBefore(oneWeekAgo)) {
+            batch.delete(doc.reference);
+            deleteCount++;
+          }
+        } catch (_) {
+          // If no actionAt field, delete the doc (malformed)
+          batch.delete(doc.reference);
+          deleteCount++;
+        }
+      }
+
+      if (deleteCount > 0) {
+        await batch.commit();
+        debugPrint("Cleaned up $deleteCount old history entries");
+      }
+    } catch (e) {
+      debugPrint("Error cleaning up old history: $e");
+    }
+  }
+
+  // ─── Fetch leave history (last 7 days) ───
+
+  Future<void> _fetchHistory() async {
+    setState(() => _isLoadingHistory = true);
+
+    try {
+      DateTime oneWeekAgo = DateTime.now().subtract(const Duration(days: 7));
+
+      var query = FirebaseFirestore.instance
+          .collection("leave_history")
+          .where("type", isEqualTo: "leave");
+
+      if (_selectedHostel != null) {
+        query = query.where("hostel", isEqualTo: _selectedHostel);
+      }
+
+      var snapshot = await query.get();
+
+      // Client-side: filter by last 7 days and sort
+      var filtered = snapshot.docs.where((doc) {
+        try {
+          Timestamp actionAt = doc["actionAt"];
+          return actionAt.toDate().isAfter(oneWeekAgo);
+        } catch (_) {
+          return false;
+        }
+      }).toList();
+
+      filtered.sort((a, b) {
+        try {
+          Timestamp aTime = a["actionAt"];
+          Timestamp bTime = b["actionAt"];
+          return bTime.compareTo(aTime);
+        } catch (_) {
+          return 0;
+        }
+      });
+
+      if (mounted) {
+        setState(() {
+          _historyRequests = filtered;
+          _isLoadingHistory = false;
+        });
+      }
+    } catch (e) {
+      debugPrint("Error fetching history: $e");
+      if (mounted) {
+        setState(() => _isLoadingHistory = false);
+      }
+    }
+  }
+
+  // ─── Fetch extension history (last 7 days) ───
+
+  Future<void> _fetchExtensionHistory() async {
+    setState(() => _isLoadingExtHistory = true);
+
+    try {
+      DateTime oneWeekAgo = DateTime.now().subtract(const Duration(days: 7));
+
+      var query = FirebaseFirestore.instance
+          .collection("leave_history")
+          .where("type", isEqualTo: "extension");
+
+      if (_selectedHostel != null) {
+        query = query.where("hostel", isEqualTo: _selectedHostel);
+      }
+
+      var snapshot = await query.get();
+
+      // Client-side: filter by last 7 days and sort
+      var filtered = snapshot.docs.where((doc) {
+        try {
+          Timestamp actionAt = doc["actionAt"];
+          return actionAt.toDate().isAfter(oneWeekAgo);
+        } catch (_) {
+          return false;
+        }
+      }).toList();
+
+      filtered.sort((a, b) {
+        try {
+          Timestamp aTime = a["actionAt"];
+          Timestamp bTime = b["actionAt"];
+          return bTime.compareTo(aTime);
+        } catch (_) {
+          return 0;
+        }
+      });
+
+      if (mounted) {
+        setState(() {
+          _extensionHistoryRequests = filtered;
+          _isLoadingExtHistory = false;
+        });
+      }
+    } catch (e) {
+      debugPrint("Error fetching extension history: $e");
+      if (mounted) {
+        setState(() => _isLoadingExtHistory = false);
+      }
+    }
+  }
+
+  // ─── Show history details dialog ───
+
+  void showHistoryDetails(BuildContext context, DocumentSnapshot historyDoc) {
+    DateTime? leavingDate;
+    DateTime? returnDate;
+
+    try {
+      if (historyDoc["leavingDate"] is Timestamp) {
+        leavingDate = (historyDoc["leavingDate"] as Timestamp).toDate();
+      }
+      if (historyDoc["returnDate"] is Timestamp) {
+        returnDate = (historyDoc["returnDate"] as Timestamp).toDate();
+      }
+    } catch (_) {}
+
+    String status = historyDoc["status"] ?? "";
+    String type = historyDoc["type"] ?? "leave";
+    String actionBy = historyDoc["actionBy"] ?? "";
+    String statusLabel = status == "approved" ? "Approved" : "Rejected";
+    Color statusColor = status == "approved" ? Colors.green : Colors.red;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(type == "extension" ? "Extension Details" : "Leave Application Details"),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Student photo
+              Center(
+                child: _buildStudentAvatarFromDoc(historyDoc, radius: 40),
+              ),
+              const SizedBox(height: 15),
+              Text("Name: ${historyDoc["name"]}"),
+              Text("Roll Number: ${historyDoc["rollNumber"]}"),
+              Text("Degree: ${historyDoc["degree"]}"),
+              Text("Hostel: ${historyDoc["hostel"]}"),
+              Text("Room: ${historyDoc["roomNumber"]}"),
+              Text("Phone: ${historyDoc["phone"]}"),
+              const SizedBox(height: 10),
+              if (leavingDate != null)
+                Text("Leaving Date: ${DateFormat('yyyy-MM-dd').format(leavingDate)}"),
+              if (returnDate != null)
+                Text("Return Date: ${DateFormat('yyyy-MM-dd').format(returnDate)}"),
+              if (historyDoc.data() != null && (historyDoc.data() as Map).containsKey("durationDays"))
+                Text("Duration: ${historyDoc["durationDays"]} days"),
+              const SizedBox(height: 10),
+              Text("Mode of Transport: ${historyDoc["modeOfTransport"]}"),
+              Text("Purpose: ${historyDoc["purpose"]}"),
+              Text("Address During Leave: ${historyDoc["addressDuringLeave"]}"),
+              Text("Parent Phone: ${historyDoc["parentPhone"]}"),
+              const SizedBox(height: 10),
+
+              // Status & warden
+              Text(
+                "$statusLabel by: $actionBy",
+                style: TextStyle(fontWeight: FontWeight.bold, color: statusColor),
+              ),
+
+              // Extension specific
+              if (type == "extension") ...[
+                Builder(builder: (context) {
+                  String? extReason;
+                  try { extReason = historyDoc["extensionReason"]; } catch (_) {}
+                  if (extReason != null && extReason.isNotEmpty) {
+                    return Text("Extension Reason: $extReason");
+                  }
+                  return const SizedBox.shrink();
+                }),
+                Builder(builder: (context) {
+                  try {
+                    Timestamp? newDate = historyDoc["extensionNewReturnDate"];
+                    if (newDate != null) {
+                      return Text("New Return Date: ${DateFormat('yyyy-MM-dd').format(newDate.toDate())}");
+                    }
+                  } catch (_) {}
+                  return const SizedBox.shrink();
+                }),
+              ],
+
+              // Rejection reason
+              Builder(builder: (context) {
+                String? rejReason;
+                try { rejReason = historyDoc["rejectionReason"]; } catch (_) {}
+                if (rejReason != null && rejReason.isNotEmpty) {
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      "Rejection Reason: $rejReason",
+                      style: const TextStyle(color: Colors.red, fontStyle: FontStyle.italic),
+                    ),
+                  );
+                }
+                return const SizedBox.shrink();
+              }),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Close"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── Tab 3: History with Toggle ───
+
+  Widget _buildHistoryTab() {
+    return Column(
+      children: [
+        // Toggle between Leave and Extension history
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+          child: Row(
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => setState(() => _historyToggle = 0),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      color: _historyToggle == 0 ? const Color(0xFF0D1B2A) : Colors.grey.shade200,
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(10),
+                        bottomLeft: Radius.circular(10),
+                      ),
+                    ),
+                    child: Center(
+                      child: Text(
+                        "Leave History",
+                        style: TextStyle(
+                          color: _historyToggle == 0 ? Colors.white : Colors.grey.shade600,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => setState(() => _historyToggle = 1),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      color: _historyToggle == 1 ? const Color(0xFF0D1B2A) : Colors.grey.shade200,
+                      borderRadius: const BorderRadius.only(
+                        topRight: Radius.circular(10),
+                        bottomRight: Radius.circular(10),
+                      ),
+                    ),
+                    child: Center(
+                      child: Text(
+                        "Extension History",
+                        style: TextStyle(
+                          color: _historyToggle == 1 ? Colors.white : Colors.grey.shade600,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: _historyToggle == 0
+              ? _buildLeaveHistoryList()
+              : _buildExtensionHistoryList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLeaveHistoryList() {
+    List<DocumentSnapshot> filtered = _historyRequests;
+    if (_historySearchQuery.isNotEmpty) {
+      filtered = _historyRequests.where((req) {
+        String name = (req["name"] ?? "").toString().toLowerCase();
+        String roll = (req["rollNumber"] ?? "").toString().toLowerCase();
+        String query = _historySearchQuery.toLowerCase();
+        return name.contains(query) || roll.contains(query);
+      }).toList();
+    }
+
+    return RefreshIndicator(
+      onRefresh: _fetchHistory,
+      child: _isLoadingHistory
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                  child: TextField(
+                    controller: _historySearchController,
+                    decoration: InputDecoration(
+                      hintText: "Search by name or roll number",
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: _historySearchQuery.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                _historySearchController.clear();
+                                setState(() => _historySearchQuery = "");
+                              },
+                            )
+                          : null,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                    ),
+                    onChanged: (value) {
+                      setState(() => _historySearchQuery = value);
+                    },
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  child: Text(
+                    "Last 7 days \u2022 ${filtered.length} entries",
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                ),
+                Expanded(
+                  child: filtered.isEmpty
+                      ? ListView(
+                          children: const [
+                            SizedBox(height: 100),
+                            Center(child: Text("No leave history")),
+                            SizedBox(height: 10),
+                            Center(child: Text("Pull down to refresh", style: TextStyle(color: Colors.grey, fontSize: 13))),
+                          ],
+                        )
+                      : ListView.builder(
+                          itemCount: filtered.length,
+                          itemBuilder: (context, index) {
+                            var request = filtered[index];
+                            String status = request["status"] ?? "";
+                            String name = request["name"] ?? "";
+                            String roll = request["rollNumber"] ?? "";
+                            String purpose = request["purpose"] ?? "";
+
+                            String? actionBy;
+                            DateTime? actionTime;
+                            try {
+                              actionBy = request["actionBy"];
+                              actionTime = (request["actionAt"] as Timestamp).toDate();
+                            } catch (_) {}
+
+                            Color statusColor = status == "approved" ? Colors.green : Colors.red;
+                            String statusText = status == "approved" ? "Approved" : "Rejected";
+
+                            return _buildHistoryCard(
+                              name: name,
+                              roll: roll,
+                              subtitle: "Purpose: $purpose",
+                              actionBy: actionBy,
+                              actionTime: actionTime,
+                              statusColor: statusColor,
+                              statusText: statusText,
+                              request: request,
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
+    );
+  }
+
+  Widget _buildExtensionHistoryList() {
+    List<DocumentSnapshot> filtered = _extensionHistoryRequests;
+    if (_historySearchQuery.isNotEmpty) {
+      filtered = _extensionHistoryRequests.where((req) {
+        String name = (req["name"] ?? "").toString().toLowerCase();
+        String roll = (req["rollNumber"] ?? "").toString().toLowerCase();
+        String query = _historySearchQuery.toLowerCase();
+        return name.contains(query) || roll.contains(query);
+      }).toList();
+    }
+
+    return RefreshIndicator(
+      onRefresh: _fetchExtensionHistory,
+      child: _isLoadingExtHistory
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                  child: TextField(
+                    controller: _historySearchController,
+                    decoration: InputDecoration(
+                      hintText: "Search by name or roll number",
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: _historySearchQuery.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                _historySearchController.clear();
+                                setState(() => _historySearchQuery = "");
+                              },
+                            )
+                          : null,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                    ),
+                    onChanged: (value) {
+                      setState(() => _historySearchQuery = value);
+                    },
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  child: Text(
+                    "Last 7 days \u2022 ${filtered.length} entries",
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                ),
+                Expanded(
+                  child: filtered.isEmpty
+                      ? ListView(
+                          children: const [
+                            SizedBox(height: 100),
+                            Center(child: Text("No extension history")),
+                            SizedBox(height: 10),
+                            Center(child: Text("Pull down to refresh", style: TextStyle(color: Colors.grey, fontSize: 13))),
+                          ],
+                        )
+                      : ListView.builder(
+                          itemCount: filtered.length,
+                          itemBuilder: (context, index) {
+                            var request = filtered[index];
+                            String status = request["status"] ?? "";
+                            String name = request["name"] ?? "";
+                            String roll = request["rollNumber"] ?? "";
+                            String reason = "";
+                            try { reason = request["extensionReason"] ?? ""; } catch (_) {}
+
+                            String? actionBy;
+                            DateTime? actionTime;
+                            try {
+                              actionBy = request["actionBy"];
+                              actionTime = (request["actionAt"] as Timestamp).toDate();
+                            } catch (_) {}
+
+                            Color statusColor = status == "approved" ? Colors.green : Colors.red;
+                            String statusText = status == "approved" ? "Approved" : "Rejected";
+
+                            return _buildHistoryCard(
+                              name: name,
+                              roll: roll,
+                              subtitle: "Reason: $reason",
+                              actionBy: actionBy,
+                              actionTime: actionTime,
+                              statusColor: statusColor,
+                              statusText: statusText,
+                              request: request,
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
+    );
+  }
+
+  // ─── Shared history card widget ───
+
+  Widget _buildHistoryCard({
+    required String name,
+    required String roll,
+    required String subtitle,
+    String? actionBy,
+    DateTime? actionTime,
+    required Color statusColor,
+    required String statusText,
+    required DocumentSnapshot request,
+  }) {
+    return GestureDetector(
+      onTap: () => showHistoryDetails(context, request),
+      child: Card(
+        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  _buildStudentAvatarFromDoc(request, radius: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                        Text("Roll: $roll", style: const TextStyle(fontSize: 13, color: Colors.grey)),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: statusColor.withOpacity(0.15),
+                      border: Border.all(color: statusColor),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Text(
+                      statusText,
+                      style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(subtitle, style: const TextStyle(fontSize: 13)),
+              if (actionBy != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  "$statusText by: $actionBy",
+                  style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: statusColor),
+                ),
+              ],
+              if (actionTime != null) ...[
+                const SizedBox(height: 2),
+                Text(
+                  DateFormat('dd MMM yyyy, hh:mm a').format(actionTime),
+                  style: const TextStyle(fontSize: 11, color: Colors.grey),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
