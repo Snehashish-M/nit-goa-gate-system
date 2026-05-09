@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
-import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:image_cropper/image_cropper.dart';
@@ -91,34 +91,53 @@ class _ProfileSetupState extends State<ProfileSetup> {
     );
 
     if (picked != null) {
+      Uint8List? bytes;
 
-      // Open cropper
-      final croppedFile = await ImageCropper().cropImage(
-        sourcePath: picked.path,
-        aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
-        compressQuality: 85,
-        maxWidth: 500,
-        maxHeight: 500,
-        uiSettings: [
-          AndroidUiSettings(
-            toolbarTitle: 'Crop Photo',
-            toolbarColor: const Color(0xFF0D1B2A),
-            toolbarWidgetColor: Colors.white,
-            activeControlsWidgetColor: const Color(0xFF1976D2),
-            initAspectRatio: CropAspectRatioPreset.square,
-            lockAspectRatio: false,
-          ),
-        ],
-      );
+      if (kIsWeb) {
+        // Web: skip cropper (not supported), read bytes directly
+        try {
+          bytes = await picked.readAsBytes();
+        } catch (e) {
+          debugPrint("Error reading image on web: $e");
+          setState(() {
+            _photoStatus = "Error reading image. Please try again. ✗";
+          });
+          return;
+        }
+      } else {
+        // Mobile: use cropper
+        final croppedFile = await ImageCropper().cropImage(
+          sourcePath: picked.path,
+          aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
+          compressQuality: 85,
+          maxWidth: 500,
+          maxHeight: 500,
+          uiSettings: [
+            AndroidUiSettings(
+              toolbarTitle: 'Crop Photo',
+              toolbarColor: const Color(0xFF0D1B2A),
+              toolbarWidgetColor: Colors.white,
+              activeControlsWidgetColor: const Color(0xFF1976D2),
+              initAspectRatio: CropAspectRatioPreset.square,
+              lockAspectRatio: false,
+            ),
+          ],
+        );
 
-      if (croppedFile == null) return;
+        if (croppedFile == null) return;
+        bytes = await croppedFile.readAsBytes();
+      }
 
-      final bytes = await File(croppedFile.path).readAsBytes();
       final sizeKB = bytes.length / 1024;
 
-      if (sizeKB > 100) {
+      // Web images can be larger since compression isn't applied by image_picker
+      final maxSizeKB = kIsWeb ? 500.0 : 100.0;
+
+      if (sizeKB > maxSizeKB) {
         setState(() {
-          _photoStatus = "Photo too large (${sizeKB.toStringAsFixed(1)}KB). Max 100KB. ✗";
+          _photoStatus = kIsWeb
+              ? "Photo too large (${sizeKB.toStringAsFixed(1)}KB). Max ${maxSizeKB.toInt()}KB. Try a smaller image. ✗"
+              : "Photo too large (${sizeKB.toStringAsFixed(1)}KB). Max ${maxSizeKB.toInt()}KB. ✗";
         });
         return;
       }

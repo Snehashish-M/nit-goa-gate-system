@@ -720,7 +720,11 @@ class _WardenDashboardState extends State<WardenDashboard>
 
               if (shouldLogout != true) return;
 
-              await GoogleSignIn().signOut();
+              try {
+                await GoogleSignIn().signOut();
+              } catch (e) {
+                debugPrint("GoogleSignIn signOut error (ignored on web): $e");
+              }
               await FirebaseAuth.instance.signOut();
               if (!context.mounted) return;
               Navigator.pushAndRemoveUntil(

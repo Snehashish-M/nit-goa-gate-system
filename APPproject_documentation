@@ -1,0 +1,653 @@
+# HostelGate — Complete Project Documentation
+
+**App Name:** HostelGate  
+**Package Name:** `com.example.nit_goa_gate_app`  
+**Firebase Project:** `nit-goa-gate-system`  
+**Version:** 1.0.0+1  
+**Repository:** https://github.com/Snehashish-M/FINAL_gate_app.git  
+**Live Web URL:** https://nit-goa-gate-system.web.app  
+
+---
+
+## 1. Project Overview
+
+HostelGate is a gate management system for NIT Goa that digitizes the campus entry/exit process. It serves three user types:
+
+| User | Platform | Purpose |
+|------|----------|---------|
+| **Students** | Android APK | Generate QR codes for entry/exit, apply for leave |
+| **Wardens** | Android APK | Approve/reject leave applications and extensions |
+| **Security Guards** | Separate app (Security Portal) | Scan QR codes at the gate |
+| **iOS Users** | Web (Safari) | Same as above, via https://nit-goa-gate-system.web.app |
+
+---
+
+## 2. Technology Stack
+
+### 2.1 Languages & Frameworks
+
+| Technology | Version | Usage |
+|-----------|---------|-------|
+| **Dart** | SDK ≥3.0.0 <4.0.0 | Primary programming language |
+| **Flutter** | Latest stable | Cross-platform UI framework |
+| **JavaScript/JSON** | — | Firebase config, web manifest |
+| **XML** | — | Android manifest, iOS plist |
+| **YAML** | — | Pubspec, analysis options |
+| **HTML** | — | Web entry point (`index.html`) |
+
+### 2.2 Flutter Dependencies
+
+| Package | Version | Purpose |
+|---------|---------|---------|
+| `firebase_core` | ^2.25.4 | Firebase initialization |
+| `firebase_auth` | ^4.17.4 | Google Sign-In authentication |
+| `cloud_firestore` | ^4.15.8 | Cloud database (read/write) |
+| `firebase_storage` | ^11.6.6 | File storage (declared but not actively used) |
+| `google_sign_in` | ^6.1.5 | Google OAuth sign-in |
+| `qr_flutter` | ^4.1.0 | QR code generation/display |
+| `image_picker` | ^1.0.7 | Photo selection from gallery |
+| `image_cropper` | ^12.1.1 | Photo cropping (Android only) |
+| `provider` | ^6.0.5 | State management (declared) |
+| `intl` | ^0.18.1 | Date formatting |
+| `cupertino_icons` | ^1.0.8 | iOS-style icons |
+
+### 2.3 Dev Dependencies
+
+| Package | Version | Purpose |
+|---------|---------|---------|
+| `flutter_test` | SDK | Widget testing |
+| `flutter_lints` | ^3.0.0 | Code linting rules |
+| `flutter_launcher_icons` | ^0.14.3 | App icon generation |
+
+---
+
+## 3. File Structure
+
+```
+nit-goa-gate-system/
+├── lib/
+│   ├── main.dart                          # App entry point, AuthGate, theme
+│   ├── firebase_options.dart              # Auto-generated Firebase config
+│   ├── screens/
+│   │   ├── login_screen.dart              # Google Sign-In (13 KB)
+│   │   ├── profile_setup.dart             # Student profile form (16 KB)
+│   │   ├── student_dashboard.dart         # Student home screen (7 KB)
+│   │   ├── app_info_screen.dart           # App usage instructions (7 KB)
+│   │   ├── day_scholar.dart               # Day scholar QR generation (6 KB)
+│   │   ├── hostel_exit.dart               # Hostel entry/exit QR (6 KB)
+│   │   ├── leave_application.dart         # Leave request form (10 KB)
+│   │   ├── leave_status.dart              # Leave status + QR display (46 KB)
+│   │   ├── warden_hostel_selection.dart    # Hostel picker for wardens (3 KB)
+│   │   └── warden_dashboard.dart          # Full warden portal (61 KB)
+│   └── services/
+│       └── user_cache.dart                # Singleton in-memory cache (2 KB)
+├── assets/
+│   └── images/
+│       ├── 11.png                         # App launcher icon
+│       ├── google_logo.png                # Google logo for login
+│       ├── image.png                      # NIT Goa building background
+│       ├── image copy.png                 # College logo overlay
+│       └── logo.png                       # Logo embedded in QR codes
+├── android/
+│   └── app/src/main/AndroidManifest.xml   # Android config (label: HostelGate)
+├── ios/
+│   └── Runner/Info.plist                  # iOS config (name: HostelGate)
+├── web/
+│   ├── index.html                         # Web entry point
+│   └── manifest.json                      # PWA manifest
+├── firebase.json                          # Firebase Hosting config
+├── pubspec.yaml                           # Dependencies & assets
+└── analysis_options.yaml                  # Lint rules
+```
+
+---
+
+## 4. Firebase Integration
+
+### 4.1 Firebase Project
+
+| Property | Value |
+|----------|-------|
+| Project ID | `nit-goa-gate-system` |
+| Hosting URL | https://nit-goa-gate-system.web.app |
+| Storage Bucket | `nit-goa-gate-system.firebasestorage.app` |
+| Messaging Sender ID | `788131250494` |
+
+### 4.2 Platform-Specific Firebase Config
+
+| Platform | API Key | App ID |
+|----------|---------|--------|
+| **Android** | `AIzaSyDrBNbvRQSKd6yaIOhulAT1bO7pJ-7nzK0` | `1:788131250494:android:c0e60820a2417134e06c6f` |
+| **iOS** | `AIzaSyA97MWySUoJXY_wKeglj94MKDv6xyfxNXM` | `1:788131250494:ios:8ba17a0784881d14e06c6f` |
+| **Web** | `AIzaSyCbxkQrj3aqQVvUVgsAD2IvbNwFtnBA5Zk` | `1:788131250494:web:d21d8ff23ad4624be06c6f` |
+
+### 4.3 Firebase Services Used
+
+| Service | Purpose |
+|---------|---------|
+| **Firebase Authentication** | Google Sign-In with @nitgoa.ac.in domain restriction |
+| **Cloud Firestore** | Primary database for all app data |
+| **Firebase Hosting** | Web deployment for iOS users |
+| **Firebase Storage** | Declared in dependencies but not actively used (photos stored as base64 in Firestore) |
+
+---
+
+## 5. Firestore Collections
+
+### 5.1 `users` Collection
+
+Stores student and warden profile data.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | string | Full name (from Google account) |
+| `email` | string | NIT Goa email |
+| `rollNumber` | string | Student roll number |
+| `degree` | string | B.Tech / M.Tech / Ph.D / JRF |
+| `hostel` | string | Talpona Hostel / Terekhol Hostel / Day Scholar |
+| `roomNumber` | string | Room number (empty for day scholars) |
+| `phone` | string | 10-digit phone number |
+| `photo` | string | Base64-encoded profile photo |
+| `role` | string | "student" or "warden" |
+| `wardenHostel` | string | (Wardens only) Assigned hostel |
+| `wardenName` | string | (Wardens only) Display name |
+| `infoAcknowledged` | boolean | Whether user has read app instructions |
+
+### 5.2 `gate_passes` Collection
+
+Stores active QR codes for hostel entry/exit and day scholars.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `studentId` | string | Firebase Auth UID |
+| `name` | string | Student name |
+| `rollNumber` | string | Roll number |
+| `degree` | string | Degree program |
+| `hostel` | string | Hostel name |
+| `roomNumber` | string | Room number |
+| `phone` | string | Phone number |
+| `destination` | string | Where the student is going |
+| `type` | string | "hostel" or "dayScholar" |
+| `status` | string | "active" |
+| `scanCount` | number | 0 = not scanned, 1 = exited, 2 = re-entered (deleted) |
+| `createdAt` | timestamp | When QR was generated |
+
+### 5.3 `leave_requests` Collection
+
+Stores leave applications and their status.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `studentId` | string | Firebase Auth UID |
+| `name` | string | Student name |
+| `rollNumber` | string | Roll number |
+| `degree` | string | Degree program |
+| `hostel` | string | Hostel name |
+| `roomNumber` | string | Room number |
+| `phone` | string | Phone number |
+| `photo` | string | Base64 profile photo |
+| `floor` | string | Floor of hostel room |
+| `leavingDate` | timestamp | Date of departure |
+| `returnDate` | timestamp | Date of return |
+| `leavingTime` | string | Time of departure (formatted) |
+| `returnTime` | string | Time of return (formatted) |
+| `durationDays` | number | Number of leave days |
+| `modeOfTransport` | string | How student will travel |
+| `purpose` | string | Reason for leave |
+| `addressDuringLeave` | string | Address while on leave |
+| `parentPhone` | string | Parent's phone number |
+| `status` | string | "pending" / "approved" / "rejected" |
+| `createdAt` | timestamp | Application submission time |
+| `approvedBy` | string | Warden name (on approval) |
+| `approvedAt` | timestamp | Approval timestamp |
+| `rejectedBy` | string | Warden name (on rejection) |
+| `rejectedAt` | timestamp | Rejection timestamp |
+| `rejectionReason` | string | Why it was rejected |
+| `extensionStatus` | string | "pending" / "approved" / "rejected" |
+| `extensionNewReturnDate` | timestamp | Requested new return date |
+| `extensionReason` | string | Reason for extension |
+| `extended` | boolean | `true` if extension approved |
+| `extensionApprovedBy` | string | Warden who approved extension |
+| `extensionApprovedAt` | timestamp | Extension approval time |
+| `extensionRejectedBy` | string | Warden who rejected extension |
+| `extensionRejectedAt` | timestamp | Extension rejection time |
+| `extensionRejectionReason` | string | Why extension was rejected |
+
+### 5.4 `leave_history` Collection
+
+Stores snapshots of approved/rejected leave actions for warden dashboard history.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `type` | string | "leave" or "extension" |
+| `status` | string | "approved" or "rejected" |
+| `actionBy` | string | Warden name |
+| `actionAt` | timestamp | When action was taken |
+| `hostel` | string | Student's hostel |
+| `name` | string | Student name |
+| `rollNumber` | string | Roll number |
+| `degree` | string | Degree program |
+| `roomNumber` | string | Room number |
+| `phone` | string | Phone number |
+| `leavingDate` | timestamp | Leave start date |
+| `returnDate` | timestamp | Leave end date |
+| `durationDays` | number | Duration |
+| `purpose` | string | Leave purpose |
+| `modeOfTransport` | string | Transport mode |
+| `addressDuringLeave` | string | Address during leave |
+| `parentPhone` | string | Parent phone |
+| `rejectionReason` | string | (If rejected) |
+| `extensionNewReturnDate` | timestamp | (If extension) |
+| `extensionReason` | string | (If extension) |
+
+---
+
+## 6. Firestore Security Rules
+
+```javascript
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    match /users/{userId} {
+      allow read, write: if request.auth != null 
+        && request.auth.token.email.matches('.*@nitgoa[.]ac[.]in$');
+    }
+    
+    match /leave_requests/{docId} {
+      allow read, delete: if true;
+      allow create, update: if request.auth != null 
+        && request.auth.token.email.matches('.*@nitgoa[.]ac[.]in$');
+    }
+    
+    match /leave_history/{docId} {
+      allow read, write: if request.auth != null 
+        && request.auth.token.email.matches('.*@nitgoa[.]ac[.]in$');
+    }
+    
+    match /gate_passes/{docId} {
+      allow read, delete: if true;
+      allow create, update: if request.auth != null 
+        && request.auth.token.email.matches('.*@nitgoa[.]ac[.]in$');
+    }
+  }
+}
+```
+
+### Why these rules:
+
+| Collection | Public Read | Public Delete | Auth Write |
+|-----------|------------|--------------|-----------|
+| `users` | ❌ | ❌ | ✅ @nitgoa.ac.in only |
+| `leave_requests` | ✅ (Security Portal) | ✅ (Security Portal) | ✅ @nitgoa.ac.in only |
+| `leave_history` | ❌ | ❌ | ✅ @nitgoa.ac.in only |
+| `gate_passes` | ✅ (Security Portal) | ✅ (Security Portal) | ✅ @nitgoa.ac.in only |
+
+`gate_passes` and `leave_requests` allow public read/delete because the Security Portal app (used by guards) does not have authentication.
+
+---
+
+## 7. Authentication Flow
+
+### 7.1 Login Process
+
+1. User opens app → `AuthGate` checks `FirebaseAuth.instance.currentUser`
+2. If not logged in → shows `LoginScreen`
+3. User taps "Sign in with Google"
+4. **Web**: Uses `signInWithPopup` (Firebase popup OAuth)
+5. **Mobile**: Uses `GoogleSignIn().signIn()` + `signInWithCredential`
+6. Domain check: only `@nitgoa.ac.in` emails allowed
+7. After sign-in → checks if user exists in `users` collection
+8. If new user → creates document with role, name, email
+9. Loads profile into `UserCache`
+10. Routes based on role and profile completeness:
+
+```
+User logged in
+├── role == "warden" → WardenDashboard
+├── profile incomplete → ProfileSetup(isFirstTime: true)
+└── profile complete → StudentDashboard
+```
+
+### 7.2 Role Detection
+
+Wardens are identified by known email addresses hardcoded in `login_screen.dart`. All other `@nitgoa.ac.in` emails are assigned the "student" role.
+
+### 7.3 Logout
+
+1. Clears `UserCache`
+2. Calls `GoogleSignIn().signOut()` (wrapped in try-catch for web compatibility)
+3. Calls `FirebaseAuth.instance.signOut()`
+4. Navigates to `LoginScreen` with all routes removed
+
+---
+
+## 8. Screens & Features
+
+### 8.1 Login Screen (`login_screen.dart` — 13 KB)
+
+- Glassmorphism-styled login page
+- NIT Goa building background with gradient overlay
+- College logo and app name
+- "Sign in with Google" button
+- Domain restriction: only @nitgoa.ac.in emails
+- Platform-aware: popup auth on web, native on mobile
+
+### 8.2 Profile Setup (`profile_setup.dart` — 16 KB)
+
+- Auto-fills name and roll number from Google account / email
+- Editable fields: Degree (dropdown), Hostel (dropdown), Room Number, Phone
+- Profile photo upload:
+  - **Android**: Pick from gallery → Crop → Compress → Base64 → Firestore
+  - **Web**: Pick from gallery → Base64 → Firestore (no cropper)
+  - **Size limit**: 100 KB (Android), 500 KB (Web)
+- Photo stored as base64 string in Firestore `users` document
+- Validates all required fields before saving
+
+### 8.3 Student Dashboard (`student_dashboard.dart` — 7 KB)
+
+- Welcome message with user's name
+- Profile photo in app bar (from cache)
+- Four navigation buttons:
+  1. **Day Scholar** → `DayScholar` screen
+  2. **Hostel Entry / Exit** → `HostelExit` screen
+  3. **Leave Application** → `LeaveApplication` screen
+  4. **Leave Status** → `LeaveStatus` screen
+- Popup menu: Edit Profile, Information, Log Out
+- Logout requires confirmation dialog
+
+### 8.4 Day Scholar (`day_scholar.dart` — 6 KB)
+
+- Destination text field
+- "Generate QR" button
+- Creates document in `gate_passes` with `type: "dayScholar"`
+- Shows QR code with embedded NIT Goa logo
+- Real-time listener (`_watchPass`): if document deleted → QR disappears
+- Prevents duplicate QR generation
+- 12-hour auto-hide for unused QR codes
+
+### 8.5 Hostel Entry/Exit (`hostel_exit.dart` — 6 KB)
+
+- Same functionality as Day Scholar but with `type: "hostel"`
+- Destination text field + Generate QR button
+- Creates document in `gate_passes` with `type: "hostel"`
+- Real-time listener for document deletion
+- 12-hour auto-hide (hides from UI only, document stays in Firebase)
+
+### 8.6 Leave Application (`leave_application.dart` — 10 KB)
+
+- Date pickers: Leaving date, Return date
+- Time pickers: Leaving time, Return time
+- Auto-calculated duration in days
+- Fields: Floor (dropdown), Mode of Transport, Purpose, Address During Leave, Parent Phone (10 digits)
+- Validates all fields before submission
+- **Duplicate check**: Prevents submitting if a pending or approved leave exists
+- Confirmation dialog before submission
+- Creates document in `leave_requests` with `status: "pending"`
+
+### 8.7 Leave Status (`leave_status.dart` — 46 KB, largest screen)
+
+- Real-time StreamBuilder listening to user's leave requests
+- Four possible states:
+
+| Status | UI |
+|--------|-----|
+| No leave request | "No leave applications found" message |
+| Pending | Yellow card with application details, "Pending" badge |
+| Approved | Green card with QR code, "Delete QR" option, "Apply for Extension" |
+| Rejected | Red card with rejection reason, auto-deleted after 2 days |
+
+- **QR Code Display**: Shows QR containing the document ID, with embedded logo
+- **Delete QR**: Requires typing "delete_qr" to confirm deletion
+- **Extension System**:
+  - Student picks a new return date + reason
+  - Creates extension fields on the same leave_requests document
+  - Extension status shown below main leave card
+  - Extension can be approved/rejected independently
+
+### 8.8 App Info Screen (`app_info_screen.dart` — 7 KB)
+
+- Informational screen explaining how to use the app
+- Sections: QR Code usage, Leave Application, Leave QR warnings, Extensions, Rejections
+- First-time users must check "I have read and understood" before proceeding
+- Sets `infoAcknowledged: true` in Firestore
+
+### 8.9 Warden Hostel Selection (`warden_hostel_selection.dart` — 3 KB)
+
+- Simple screen with two buttons: Talpona Hostel, Terekhol Hostel
+- Routes to `WardenDashboard`
+
+### 8.10 Warden Dashboard (`warden_dashboard.dart` — 61 KB, most complex screen)
+
+Three tabs with a hostel dropdown filter:
+
+#### Tab 1: Leave Requests
+- Lists pending leave applications for selected hostel
+- Search by name or roll number
+- Expandable cards showing full application details
+- **Approve**: Adds `approvedBy`, `approvedAt`, changes status to "approved"
+- **Reject**: Dialog for rejection reason, adds `rejectedBy`, `rejectedAt`, `rejectionReason`
+- Both actions save a snapshot to `leave_history`
+
+#### Tab 2: Extension Requests
+- Lists pending extension requests
+- Shows original leave details + extension request
+- **Approve Extension**: Updates `extended: true`, `extensionApprovedBy`, `extensionApprovedAt`, `extensionNewReturnDate`
+- **Reject Extension**: Adds `extensionRejectedBy`, `extensionRejectedAt`, `extensionRejectionReason`
+- Both actions save a snapshot to `leave_history`
+
+#### Tab 3: History
+- Toggle between Leave History and Extension History
+- Shows approved/rejected actions from last 7 days
+- Fetches from `leave_history` collection (not `leave_requests`)
+- Tap card to see full details dialog
+- Shows warden name and action timestamp
+- **Auto-cleanup**: Deletes entries older than 7 days from Firebase on dashboard load
+
+---
+
+## 9. QR Code System
+
+### 9.1 Gate Pass QR (Hostel & Day Scholar)
+
+| Property | Value |
+|----------|-------|
+| QR Data | Firestore document ID from `gate_passes` |
+| Logo | NIT Goa logo embedded in center (40×40px) |
+| Size | 250×250px |
+| Library | `qr_flutter` v4.1.0 |
+
+**Lifecycle:**
+1. Student generates QR → document created in `gate_passes`
+2. Guard scans (1st time) → `scanCount` incremented to 1 (student exits)
+3. Guard scans (2nd time) → document deleted (student re-enters)
+4. `_watchPass` listener detects deletion → QR disappears from app
+5. If not scanned → hidden from app after 12 hours (document remains in Firebase)
+
+### 9.2 Leave QR
+
+| Property | Value |
+|----------|-------|
+| QR Data | Firestore document ID from `leave_requests` |
+| Generated when | Warden approves the leave application |
+| Deleted by | Student manually (typing "delete_qr") or Security Portal |
+
+**Key behavior:**
+- QR contains only the document ID — the guard's scanner reads full details from Firebase
+- If extension is approved, the Firebase document is updated but QR code stays the same
+- Same QR is valid for the entire leave duration including extensions
+
+---
+
+## 10. Caching Strategy
+
+### UserCache (Singleton)
+
+```
+Location: lib/services/user_cache.dart
+Pattern: Singleton with in-memory cache
+```
+
+| Method | Purpose |
+|--------|---------|
+| `loadProfile()` | Loads from Firestore, caches in memory. Skips Firestore if already cached |
+| `loadProfile(forceRefresh: true)` | Always reads from Firestore |
+| `updateCache(data)` | Updates local cache without Firestore write |
+| `clear()` | Clears cache (called on logout) |
+| `profileData` | Getter for cached data |
+
+**How it reduces Firestore reads:**
+- Profile loaded once at login (`AuthGate`) with `forceRefresh: true`
+- All subsequent screens read from `UserCache().profileData` — zero Firestore reads
+- Profile save in `ProfileSetup` updates both Firestore + cache
+- Logout clears cache
+
+---
+
+## 11. UI Theme & Design
+
+### Color Palette
+
+| Color | Hex | Usage |
+|-------|-----|-------|
+| Navy Blue (Primary) | `#0A192F` | App bar, buttons, primary actions |
+| Cyan Blue (Secondary) | `#00B4D8` | Tab indicator, accents |
+| White | `#FFFFFF` | Scaffold background, cards |
+| Grey shades | Various | Input fields, borders, subtitles |
+
+### Design Elements
+
+- **App Bar**: Navy blue with rounded bottom corners (16px radius)
+- **Buttons**: Navy blue with white text, 12px rounded corners, elevation 4
+- **Cards**: White with 16px rounded corners, shadow elevation 4
+- **Input Fields**: Filled grey background, 12px rounded borders
+- **Dialogs**: 16px rounded corners
+- **Login Page**: Glassmorphism style with blurred background image
+- **Portrait-only**: App locked to portrait orientation
+
+---
+
+## 12. Deployment
+
+### 12.1 Android APK
+
+```bash
+flutter build apk --release
+```
+- Output: `build/app/outputs/flutter-apk/app-release.apk` (55.8 MB)
+- App label: "HostelGate"
+- App icon: Custom NIT Goa logo (`assets/images/11.png`) on navy background
+
+### 12.2 Web (for iOS users)
+
+```bash
+flutter build web --release
+firebase deploy --only hosting
+```
+- Output: `build/web/` → deployed to Firebase Hosting
+- Live at: https://nit-goa-gate-system.web.app
+- PWA manifest configured with name "HostelGate"
+- SPA routing: all paths rewrite to `/index.html`
+
+### 12.3 Firebase Hosting Config
+
+```json
+{
+  "hosting": {
+    "public": "build/web",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "rewrites": [{ "source": "**", "destination": "/index.html" }]
+  }
+}
+```
+
+### 12.4 App Icon Config
+
+```yaml
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/images/11.png"
+  adaptive_icon_background: "#0D1B2A"
+  adaptive_icon_foreground: "assets/images/11.png"
+```
+
+---
+
+## 13. Web-Specific Handling
+
+| Feature | Android | Web (iOS) |
+|---------|---------|-----------|
+| Google Sign-In | Native `GoogleSignIn` | `signInWithPopup` |
+| Photo cropping | `ImageCropper` with Android UI | Skipped (not supported) |
+| Photo size limit | 100 KB | 500 KB |
+| Logout | `GoogleSignIn().signOut()` | Wrapped in try-catch (can fail) |
+| Auth method | `signInWithCredential` | `signInWithPopup` |
+
+---
+
+## 14. Known Limitations & Behaviors
+
+### 14.1 QR Code Behaviors
+- Gate pass QR hidden from app after 12 hours regardless of scan count
+- If student exits (1st scan) but doesn't return within 12 hours, QR disappears from app but stays in Firebase
+- Student can generate a new QR after old one is hidden
+- Unused gate passes pile up in Firebase (not auto-deleted)
+
+### 14.2 Leave System
+- Only one pending/approved leave request allowed per student
+- Rejected leave requests auto-deleted after 2 days
+- Extension can only be applied once per leave
+- QR code doesn't change when extension is approved (just the Firebase document updates)
+
+### 14.3 History
+- Warden history shows last 7 days only
+- Auto-cleanup deletes history entries older than 7 days from Firebase
+- History persists even if student deletes their leave QR
+
+### 14.4 Photo Storage
+- Photos stored as base64 strings in Firestore (not Firebase Storage)
+- Limited to 100 KB (Android) / 500 KB (Web) to stay within Firestore document size limits
+
+### 14.5 Security
+- `gate_passes` and `leave_requests` allow public read/delete (for Security Portal)
+- `users` and `leave_history` require authenticated @nitgoa.ac.in email
+- API keys are visible in `firebase_options.dart` (standard for Firebase client apps)
+
+---
+
+## 15. Firestore Usage Estimates (1200 students)
+
+| Resource | Free Tier Limit | Estimated Daily Usage |
+|----------|-----------------|----------------------|
+| Reads | 50,000/day | ~6,000 (well within) |
+| Writes | 20,000/day | ~1,500 (well within) |
+| Deletes | 20,000/day | ~500 (well within) |
+| Storage | 1 GB | ~50 MB (growing slowly) |
+
+---
+
+## 16. Configuration Files Summary
+
+| File | Format | Purpose |
+|------|--------|---------|
+| `pubspec.yaml` | YAML | Dependencies, assets, app metadata |
+| `analysis_options.yaml` | YAML | Dart linting rules |
+| `firebase.json` | JSON | Firebase Hosting config |
+| `web/manifest.json` | JSON | PWA manifest (name, icons, colors) |
+| `web/index.html` | HTML | Web entry point, meta tags, title |
+| `android/app/src/main/AndroidManifest.xml` | XML | Android permissions, app label |
+| `ios/Runner/Info.plist` | XML (plist) | iOS app config, display name |
+| `lib/firebase_options.dart` | Dart | Auto-generated Firebase API keys |
+| `.gitignore` | Text | Git ignore rules |
+| `.metadata` | Text | Flutter project metadata |
+
+---
+
+## 17. Git Information
+
+| Property | Value |
+|----------|-------|
+| Repository | https://github.com/Snehashish-M/FINAL_gate_app.git |
+| Branch | `main` |
+| Remote | `origin` |

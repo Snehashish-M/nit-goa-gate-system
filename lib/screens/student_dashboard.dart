@@ -86,7 +86,11 @@ class _StudentDashboardState extends State<StudentDashboard> {
       if (shouldLogout != true) return;
 
       UserCache().clear();
-      await GoogleSignIn().signOut();
+      try {
+        await GoogleSignIn().signOut();
+      } catch (e) {
+        debugPrint("GoogleSignIn signOut error (ignored on web): $e");
+      }
       await FirebaseAuth.instance.signOut();
 
       if (!mounted) return;
