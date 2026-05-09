@@ -65,12 +65,15 @@ class _HostelExitState extends State<HostelExit> {
 
       if (snapshot.docs.isNotEmpty && mounted) {
         var doc = snapshot.docs.first;
-        // Only show QR for passes created today — clears at midnight
+        // Delete passes from previous days — clears at midnight
         var createdAt = doc["createdAt"] as Timestamp?;
         if (createdAt != null) {
           var now = DateTime.now();
           var todayMidnight = DateTime(now.year, now.month, now.day);
-          if (createdAt.toDate().isBefore(todayMidnight)) return;
+          if (createdAt.toDate().isBefore(todayMidnight)) {
+            doc.reference.delete();
+            return;
+          }
         }
         setState(() {
           qrData = doc.id;

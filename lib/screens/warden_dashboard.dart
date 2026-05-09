@@ -41,6 +41,9 @@ class _WardenDashboardState extends State<WardenDashboard>
   String? _selectedHostel;
   final List<String> _hostels = ["Talpona Hostel", "Terekhol Hostel"];
 
+  // Pinned leave request IDs (in-memory, per session)
+  final Set<String> _pinnedRequestIds = {};
+
   @override
   void initState() {
     super.initState();
@@ -783,6 +786,15 @@ class _WardenDashboardState extends State<WardenDashboard>
       }).toList();
     }
 
+    // Sort: pinned requests first
+    filtered.sort((a, b) {
+      bool aPinned = _pinnedRequestIds.contains(a.id);
+      bool bPinned = _pinnedRequestIds.contains(b.id);
+      if (aPinned && !bPinned) return -1;
+      if (!aPinned && bPinned) return 1;
+      return 0;
+    });
+
     return RefreshIndicator(
       onRefresh: _fetchPendingRequests,
       child: _isLoadingLeaves
@@ -865,6 +877,26 @@ class _WardenDashboardState extends State<WardenDashboard>
                                                 Text("Roll: ${request["rollNumber"]}"),
                                                 Text("${request["degree"]} • ${request["hostel"]} - ${request["roomNumber"]}"),
                                               ],
+                                            ),
+                                          ),
+                                          GestureDetector(
+                                            onTap: () {
+                                              setState(() {
+                                                if (_pinnedRequestIds.contains(request.id)) {
+                                                  _pinnedRequestIds.remove(request.id);
+                                                } else {
+                                                  _pinnedRequestIds.add(request.id);
+                                                }
+                                              });
+                                            },
+                                            child: Icon(
+                                              _pinnedRequestIds.contains(request.id)
+                                                  ? Icons.push_pin
+                                                  : Icons.push_pin_outlined,
+                                              color: _pinnedRequestIds.contains(request.id)
+                                                  ? const Color(0xFF0A192F)
+                                                  : Colors.grey,
+                                              size: 22,
                                             ),
                                           ),
                                         ],
