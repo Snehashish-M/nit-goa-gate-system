@@ -7,7 +7,8 @@ import 'package:qr_flutter/qr_flutter.dart';
 
 
 class LeaveStatus extends StatefulWidget {
-  const LeaveStatus({super.key});
+  final bool embedded;
+  const LeaveStatus({super.key, this.embedded = false});
 
   @override
   State<LeaveStatus> createState() => _LeaveStatusState();
@@ -272,32 +273,23 @@ class _LeaveStatusState extends State<LeaveStatus> {
     User? user = FirebaseAuth.instance.currentUser;
 
     if (user == null) {
-      return Scaffold(
-        appBar: AppBar(title: const Text("Leave Status")),
-        body: const Center(child: Text("Not logged in")),
-      );
+      return const Center(child: Text("Not logged in"));
     }
 
-    return Scaffold(
-
-      appBar: AppBar(
-        title: const Text("Leave Application Status"),
-      ),
-
-      body: RefreshIndicator(
-        onRefresh: _fetchLeaveRequests,
-        child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : _leaveRequests.isEmpty
-                ? ListView(
-                    children: const [
-                      SizedBox(height: 200),
-                      Center(child: Text("No leave applications submitted")),
-                      SizedBox(height: 20),
-                      Center(
-                        child: Text(
-                          "Pull down to refresh",
-                          style: TextStyle(color: Colors.grey, fontSize: 13),
+    Widget body = RefreshIndicator(
+      onRefresh: _fetchLeaveRequests,
+      child: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _leaveRequests.isEmpty
+              ? ListView(
+                  children: const [
+                    SizedBox(height: 200),
+                    Center(child: Text("No leave applications submitted")),
+                    SizedBox(height: 20),
+                    Center(
+                      child: Text(
+                        "Pull down to refresh",
+                        style: TextStyle(color: Colors.grey, fontSize: 13),
                         ),
                       ),
                     ],
@@ -589,8 +581,15 @@ class _LeaveStatusState extends State<LeaveStatus> {
                     },
 
                   ),
-      ),
+      );
 
+    if (widget.embedded) return body;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("Leave Application Status"),
+      ),
+      body: body,
     );
 
   }

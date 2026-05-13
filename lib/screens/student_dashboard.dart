@@ -7,8 +7,8 @@ import 'package:nit_goa_gate_app/services/user_cache.dart';
 
 import 'day_scholar.dart';
 import 'hostel_exit.dart';
-import 'leave_application.dart';
-import 'leave_status.dart';
+import 'leave_portal.dart';
+import 'vehicle_portal.dart';
 import 'profile_setup.dart';
 import 'login_screen.dart';
 import 'app_info_screen.dart';
@@ -230,7 +230,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const LeaveApplication(),
+                      builder: (context) => const LeavePortal(),
                     ),
                   );
                 },
@@ -247,11 +247,11 @@ class _StudentDashboardState extends State<StudentDashboard> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const LeaveStatus(),
+                      builder: (context) => const VehiclePortal(),
                     ),
                   );
                 },
-                child: const Text("Leave Status"),
+                child: const Text("Vehicle Entry"),
               ),
             ),
 

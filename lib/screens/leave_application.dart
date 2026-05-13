@@ -5,7 +5,8 @@ import 'package:intl/intl.dart';
 import 'package:nit_goa_gate_app/services/user_cache.dart';
 
 class LeaveApplication extends StatefulWidget {
-  const LeaveApplication({super.key});
+  final bool embedded;
+  const LeaveApplication({super.key, this.embedded = false});
 
   @override
   State<LeaveApplication> createState() => _LeaveApplicationState();
@@ -558,16 +559,10 @@ class _LeaveApplicationState extends State<LeaveApplication> {
   @override
   Widget build(BuildContext context) {
 
-    return Scaffold(
-
-      appBar: AppBar(
-        title: const Text("Leave Application"),
-      ),
-
-      body: userData == null
-          ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 30),
+    Widget body = userData == null
+        ? const Center(child: CircularProgressIndicator())
+        : ListView(
+            padding: const EdgeInsets.fromLTRB(20, 10, 20, 30),
               children: [
 
                 // ─── DEPARTURE ────────────────────────────
@@ -795,7 +790,15 @@ class _LeaveApplicationState extends State<LeaveApplication> {
                 const SizedBox(height: 10),
 
               ],
-            ),
+            );
+
+    if (widget.embedded) return body;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("Leave Application"),
+      ),
+      body: body,
     );
   }
 }

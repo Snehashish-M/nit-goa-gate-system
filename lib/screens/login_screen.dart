@@ -7,6 +7,7 @@ import 'package:nit_goa_gate_app/services/user_cache.dart';
 
 import 'student_dashboard.dart';
 import 'warden_dashboard.dart';
+import 'vehicle_authority_dashboard.dart';
 import 'profile_setup.dart';
 import 'app_info_screen.dart';
 
@@ -119,6 +120,13 @@ class LoginScreen extends StatelessWidget {
             context,
             MaterialPageRoute(
               builder: (context) => const WardenDashboard(),
+            ),
+          );
+        } else if (role == "vehicle_authority") {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const VehicleAuthorityDashboard(),
             ),
           );
         } else {

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:nit_goa_gate_app/services/user_cache.dart';
 
 class DayScholar extends StatefulWidget {
@@ -22,6 +23,10 @@ class _DayScholarState extends State<DayScholar> {
   bool _isLoading = false;
   StreamSubscription? _passListener;
 
+  // SharedPreferences keys for day scholar pass
+  static const _keyPassId = 'day_scholar_pass_id';
+  static const _keyCreatedAt = 'day_scholar_pass_created_at';
+
   @override
   void initState() {
     super.initState();
@@ -31,7 +36,7 @@ class _DayScholarState extends State<DayScholar> {
       // Fallback: load from Firestore if cache is empty
       _loadFromFirestore();
     }
-    _loadExistingPass();
+    _loadPass();
   }
 
   @override
@@ -50,8 +55,40 @@ class _DayScholarState extends State<DayScholar> {
     }
   }
 
-  /// Check if there's already an active day scholar gate pass for this user
-  Future _loadExistingPass() async {
+  /// Load pass — first from local cache (instant), then verify with Firebase
+  Future _loadPass() async {
+    // Step 1: Show QR instantly from local cache
+    final prefs = await SharedPreferences.getInstance();
+    String? cachedPassId = prefs.getString(_keyPassId);
+    int? cachedCreatedAt = prefs.getInt(_keyCreatedAt);
+
+    if (cachedPassId != null && cachedCreatedAt != null) {
+      // Midnight check — clear expired passes locally
+      var createdDate = DateTime.fromMillisecondsSinceEpoch(cachedCreatedAt);
+      var now = DateTime.now();
+      var todayMidnight = DateTime(now.year, now.month, now.day);
+
+      if (createdDate.isBefore(todayMidnight)) {
+        // Pass expired — clear local cache
+        await _clearLocalCache();
+      } else {
+        // Pass is valid — show it immediately
+        if (mounted) {
+          setState(() {
+            qrData = cachedPassId;
+          });
+        }
+        // Start watching for Firebase deletion
+        _watchPass(cachedPassId);
+      }
+    }
+
+    // Step 2: Verify with Firebase in background (if internet available)
+    _verifyWithFirebase();
+  }
+
+  /// Background verification with Firebase
+  Future _verifyWithFirebase() async {
     User? user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
@@ -73,17 +110,47 @@ class _DayScholarState extends State<DayScholar> {
           var todayMidnight = DateTime(now.year, now.month, now.day);
           if (createdAt.toDate().isBefore(todayMidnight)) {
             doc.reference.delete();
+            await _clearLocalCache();
             return;
           }
         }
-        setState(() {
-          qrData = doc.id;
-        });
+        // Firebase confirms pass exists — update local if needed
+        if (qrData != doc.id) {
+          await _saveToLocalCache(doc.id, doc["createdAt"] as Timestamp);
+          if (mounted) {
+            setState(() {
+              qrData = doc.id;
+            });
+          }
+        }
         _watchPass(doc.id);
+      } else if (snapshot.docs.isEmpty && qrData != null) {
+        // Firebase says no pass exists — clear local cache
+        await _clearLocalCache();
+        if (mounted) {
+          setState(() {
+            qrData = null;
+          });
+        }
       }
     } catch (e) {
-      debugPrint("Error loading existing pass: $e");
+      // Network error — local cache keeps QR visible, which is fine
+      debugPrint("Firebase verify error (using local cache): $e");
     }
+  }
+
+  /// Save pass ID to local cache
+  Future _saveToLocalCache(String passId, Timestamp createdAt) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyPassId, passId);
+    await prefs.setInt(_keyCreatedAt, createdAt.toDate().millisecondsSinceEpoch);
+  }
+
+  /// Clear local cache
+  Future _clearLocalCache() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_keyPassId);
+    await prefs.remove(_keyCreatedAt);
   }
 
   Future generateQR() async {
@@ -118,6 +185,8 @@ class _DayScholarState extends State<DayScholar> {
       DocumentReference passRef =
           FirebaseFirestore.instance.collection("gate_passes").doc();
 
+      Timestamp now = Timestamp.now();
+
       await passRef.set({
 
         "studentId": user.uid,
@@ -135,9 +204,12 @@ class _DayScholarState extends State<DayScholar> {
 
         "scanCount": 0,
 
-        "createdAt": Timestamp.now()
+        "createdAt": now
 
       });
+
+      // Save to local cache
+      await _saveToLocalCache(passRef.id, now);
 
       setState(() {
         qrData = passRef.id;
@@ -172,8 +244,9 @@ class _DayScholarState extends State<DayScholar> {
         .collection("gate_passes")
         .doc(passId)
         .snapshots()
-        .listen((snapshot) {
+        .listen((snapshot) async {
       if (!snapshot.exists && mounted) {
+        await _clearLocalCache();
         setState(() {
           qrData = null;
         });

@@ -7,6 +7,7 @@ import 'package:nit_goa_gate_app/services/user_cache.dart';
 import 'package:nit_goa_gate_app/screens/login_screen.dart';
 import 'package:nit_goa_gate_app/screens/student_dashboard.dart';
 import 'package:nit_goa_gate_app/screens/warden_dashboard.dart';
+import 'package:nit_goa_gate_app/screens/vehicle_authority_dashboard.dart';
 import 'package:nit_goa_gate_app/screens/profile_setup.dart';
 
 Future<void> main() async {
@@ -158,6 +159,11 @@ class _AuthGateState extends State<AuthGate> {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const WardenDashboard()),
+        );
+      } else if (role == "vehicle_authority") {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const VehicleAuthorityDashboard()),
         );
       } else {
         bool hasRollNumber = data["rollNumber"] != null &&
